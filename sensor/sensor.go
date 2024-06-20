@@ -152,29 +152,28 @@ func (s *failoverSensor) tryReadingOrFail(ctx context.Context, sensor sensor.Sen
 
 func (s *failoverSensor) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
 	reading, err := s.tryReadingOrFail(ctx, s.lastWorkingSensor, extra)
-	if err == nil {
+	if reading != nil {
 		return reading, nil
 	}
+	s.logger.Warnf(err.Error())
 
 	// primary failed, start goroutine to check for it to get readings again.
-	s.mu.Lock()
 	if s.lastWorkingSensor == s.primary {
 		s.activeBackgroundWorkers.Add(1)
 		s.pollPrimaryForHealth(s.cancelCtx, extra)
 	}
-	s.mu.Unlock()
 
 	for _, backup := range s.backups {
 		// if the last working sensor is a backup, it was already tried above.
 		s.mu.Lock()
-		if backup == s.lastWorkingSensor {
+		if s.lastWorkingSensor == backup {
 			continue
 		}
 		s.mu.Unlock()
 		s.logger.Infof("calling backup %s", backup.Name())
 		reading, err := s.tryReadingOrFail(ctx, backup, extra)
 		if err != nil {
-			s.logger.Infof(err.Error())
+			s.logger.Warnf(err.Error())
 		} else {
 			s.logger.Infof("successfully got reading from %s", backup.Name())
 			s.mu.Lock()
