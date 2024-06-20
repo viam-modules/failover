@@ -98,21 +98,22 @@ func newFailoverSensor(ctx context.Context, deps resource.Dependencies, rawConf 
 }
 
 type failoverSensor struct {
-	name   resource.Name
+	name resource.Name
+	resource.AlwaysRebuild
 	logger logging.Logger
 	cfg    *Config
 
 	cancelCtx  context.Context
 	cancelFunc func()
 
-	primary           sensor.Sensor
-	backups           []sensor.Sensor
-	timeout           int
-	lastWorkingSensor sensor.Sensor
+	primary sensor.Sensor
+	backups []sensor.Sensor
+	timeout int
+
 	mu                sync.Mutex
+	lastWorkingSensor sensor.Sensor
 
 	activeBackgroundWorkers sync.WaitGroup
-	resource.AlwaysRebuild
 }
 
 func (s *failoverSensor) Name() resource.Name {
@@ -121,39 +122,37 @@ func (s *failoverSensor) Name() resource.Name {
 
 type readingsResult struct {
 	reading map[string]interface{}
-	Error   error
+	err     error
 }
 
 func getReading(ctx context.Context, sensor resource.Sensor, extra map[string]interface{}) readingsResult {
 	readings, err := sensor.Readings(ctx, extra)
 	return readingsResult{
 		reading: readings,
-		Error:   err,
+		err:     err,
 	}
 }
 
-func (s *failoverSensor) tryReadingOrFail(ctx context.Context, sensor sensor.Sensor, extra map[string]interface{}) map[string]interface{} {
+func (s *failoverSensor) tryReadingOrFail(ctx context.Context, sensor sensor.Sensor, extra map[string]interface{}) (map[string]interface{}, error) {
 	result := make(chan readingsResult, 1)
 	go func() {
 		result <- getReading(ctx, sensor, extra)
 	}()
 	select {
 	case <-time.After(time.Duration(s.timeout * 1e6)):
-		s.logger.Infof("%s timed out", sensor.Name())
-		return nil
+		return nil, fmt.Errorf("%s timed out", sensor.Name())
 	case result := <-result:
-		if result.Error != nil {
-			s.logger.Infof("sensor %s failed to get readings: %s", sensor.Name(), result.Error.Error())
-			return nil
+		if result.err != nil {
+			return nil, fmt.Errorf("sensor %s failed to get readings: %s", sensor.Name(), result.err.Error())
 		} else {
-			return result.reading
+			return result.reading, nil
 		}
 	}
 }
 
 func (s *failoverSensor) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
-	reading := s.tryReadingOrFail(ctx, s.lastWorkingSensor, extra)
-	if reading != nil {
+	reading, err := s.tryReadingOrFail(ctx, s.lastWorkingSensor, extra)
+	if err == nil {
 		return reading, nil
 	}
 
@@ -161,28 +160,30 @@ func (s *failoverSensor) Readings(ctx context.Context, extra map[string]interfac
 	s.mu.Lock()
 	if s.lastWorkingSensor == s.primary {
 		s.activeBackgroundWorkers.Add(1)
-		s.pollForHealth(s.cancelCtx, extra)
+		s.pollPrimaryForHealth(s.cancelCtx, extra)
 	}
 	s.mu.Unlock()
 
-	// try the backups.
 	for _, backup := range s.backups {
-		// already tried this one.
+		// if a backup is the last working sensor, it was already tried above.
 		s.mu.Lock()
 		if backup == s.lastWorkingSensor {
 			continue
 		}
 		s.mu.Unlock()
 		s.logger.Infof("calling backup %s", backup.Name())
-		reading := s.tryReadingOrFail(ctx, backup, extra)
-		if reading != nil {
+		reading, err := s.tryReadingOrFail(ctx, backup, extra)
+		if err != nil {
+			s.logger.Infof(err.Error())
+		} else {
+			s.logger.Infof("successfully got reading from %s", backup.Name())
 			s.mu.Lock()
 			s.lastWorkingSensor = backup
 			s.mu.Unlock()
 			return reading, nil
 		}
 	}
-	// couldnt get reading from any sensors.
+	// couldn't get reading from any sensors.
 	return nil, fmt.Errorf("failover %s: all sensors failed to get readings", s.Name())
 }
 
@@ -197,27 +198,21 @@ func (s *failoverSensor) Close(ctx context.Context) error {
 	return nil
 }
 
-func (s *failoverSensor) pollForHealth(ctx context.Context, extra map[string]interface{}) {
+// pollPrimaryForHealth starts a background routine that continuously polls the primary sensor until it returns a reading.
+func (s *failoverSensor) pollPrimaryForHealth(ctx context.Context, extra map[string]interface{}) {
 	utils.ManagedGo(func() {
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			default:
-				result := make(chan readingsResult, 1)
-				go func() {
-					result <- getReading(ctx, s.primary, extra)
-				}()
-				select {
-				case <-time.After(time.Duration(s.timeout * 1e6)):
-				case result := <-result:
-					if result.reading != nil {
-						s.logger.Infof("primary sensor successfully got reading")
-						s.mu.Lock()
-						s.lastWorkingSensor = s.primary
-						s.mu.Unlock()
-						return
-					}
+				_, err := s.tryReadingOrFail(ctx, s.primary, extra)
+				if err == nil {
+					s.logger.Infof("successfully got reading from primary sensor")
+					s.mu.Lock()
+					s.lastWorkingSensor = s.primary
+					s.mu.Unlock()
+					return
 				}
 			}
 		}
