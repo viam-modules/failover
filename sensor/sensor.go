@@ -164,12 +164,12 @@ func (s *failoverSensor) Readings(ctx context.Context, extra map[string]interfac
 	}
 
 	for _, backup := range s.backups {
-		// if the last working sensor is a backup, it was already tried above.
 		s.mu.Lock()
+		defer s.mu.Unlock()
+		// if the last working sensor is a backup, it was already tried above.
 		if s.lastWorkingSensor == backup {
 			continue
 		}
-		s.mu.Unlock()
 		s.logger.Infof("calling backup %s", backup.Name())
 		reading, err := s.tryReadingOrFail(ctx, backup, extra)
 		if err != nil {
