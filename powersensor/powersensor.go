@@ -1,12 +1,10 @@
 package powersensor
 
 import (
+	"context"
 	"errors"
 
 	"go.viam.com/rdk/components/powersensor"
-
-	"context"
-
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 )
@@ -33,7 +31,6 @@ type Config struct {
 	/* Uncomment this if your model does not need to be validated
 	   and has no implicit dependecies. */
 	// resource.TriviallyValidateConfig
-
 }
 
 func (cfg *Config) Validate(path string) ([]string, error) {
@@ -56,7 +53,6 @@ type failoverpowersensor struct {
 	// Uncomment this if the model does not have any goroutines that
 	// need to be shut down while closing.
 	// resource.TriviallyCloseable
-
 }
 
 func newfailoverpowersensor(ctx context.Context, deps resource.Dependencies, rawConf resource.Config, logger logging.Logger) (powersensor.PowerSensor, error) {

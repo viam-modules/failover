@@ -1,3 +1,4 @@
+// package main
 package main
 
 import (
@@ -5,10 +6,11 @@ import (
 
 	failsensor "failover/sensor"
 
+	"go.viam.com/utils"
+
 	"go.viam.com/rdk/components/sensor"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/module"
-	"go.viam.com/utils"
 )
 
 func main() {

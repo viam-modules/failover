@@ -1,6 +1,4 @@
-// Package failoversensor implements a sensor where all methods are unimplemented.
-// It extends the built-in resource subtype sensor and implements methods to handle resource construction and attribute configuration.
-
+// Package failoversensor implements a sensor that specifies primary and backup sensors in case of failure.
 package failoversensor
 
 import (
@@ -10,14 +8,15 @@ import (
 	"sync"
 	"time"
 
+	"go.viam.com/utils"
+
 	"go.viam.com/rdk/components/sensor"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
-
-	"go.viam.com/utils"
 )
 
 var (
+	// Model defines triplet name.
 	Model            = resource.NewModel("viam", "failover", "sensor")
 	errUnimplemented = errors.New("unimplemented")
 )
@@ -30,14 +29,15 @@ func init() {
 	)
 }
 
+// Config is used for converting config attributes.
 type Config struct {
 	Primary string   `json:"primary"`
 	Backups []string `json:"backups"`
 	Timeout int      `json:"timeout_ms,omitempty"`
 }
 
+// Validate performs config validation.
 func (cfg *Config) Validate(path string) ([]string, error) {
-
 	var deps []string
 	if cfg.Primary == "" {
 		return nil, utils.NewConfigValidationFieldRequiredError(path, "primary")
@@ -53,7 +53,9 @@ func (cfg *Config) Validate(path string) ([]string, error) {
 	return deps, nil
 }
 
-func newFailoverSensor(ctx context.Context, deps resource.Dependencies, rawConf resource.Config, logger logging.Logger) (sensor.Sensor, error) {
+func newFailoverSensor(ctx context.Context, deps resource.Dependencies, rawConf resource.Config, logger logging.Logger) (
+	sensor.Sensor, error,
+) {
 	conf, err := resource.NativeConfig[*Config](rawConf)
 	if err != nil {
 		return nil, err
@@ -82,12 +84,11 @@ func newFailoverSensor(ctx context.Context, deps resource.Dependencies, rawConf 
 			return nil, err
 		}
 		s.backups = append(s.backups, backup)
-
 	}
 
 	s.lastWorkingSensor = primary
 
-	// defualt timeout is 1 second.
+	// default timeout is 1 second.
 	s.timeout = 1000
 	if conf.Timeout > 0 {
 		s.timeout = conf.Timeout

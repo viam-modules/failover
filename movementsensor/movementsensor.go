@@ -1,13 +1,12 @@
 package movementsensor
 
 import (
-	"go.viam.com/rdk/components/movementsensor"
-
 	"context"
 
 	"github.com/golang/geo/r3"
 	geo "github.com/kellydunn/golang-geo"
 
+	"go.viam.com/rdk/components/movementsensor"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/spatialmath"
@@ -32,7 +31,6 @@ type Config struct {
 	/* Uncomment this if your model does not need to be validated
 	   and has no implicit dependecies. */
 	// resource.TriviallyValidateConfig
-
 }
 
 func (cfg *Config) Validate(path string) ([]string, error) {
@@ -55,7 +53,6 @@ type failovermovementsensor struct {
 	// Uncomment this if the model does not have any goroutines that
 	// need to be shut down while closing.
 	// resource.TriviallyCloseable
-
 }
 
 func newfailovermovementsensor(ctx context.Context, deps resource.Dependencies, rawConf resource.Config, logger logging.Logger) (movementsensor.MovementSensor, error) {
@@ -91,7 +88,6 @@ func (s *failovermovementsensor) Position(ctx context.Context, extra map[string]
 
 func (s *failovermovementsensor) LinearVelocity(ctx context.Context, extra map[string]interface{}) (r3.Vector, error) {
 	return r3.Vector{}, nil
-
 }
 
 func (s *failovermovementsensor) AngularVelocity(ctx context.Context, extra map[string]interface{}) (spatialmath.AngularVelocity, error) {

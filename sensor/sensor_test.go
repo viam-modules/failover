@@ -2,22 +2,25 @@ package failoversensor
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"testing"
 	"time"
+
+	"go.viam.com/test"
 
 	"go.viam.com/rdk/components/sensor"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/testutils/inject"
-	"go.viam.com/test"
 )
 
-const primaryName = "primary"
-const backup1Name = "backup1"
-const backup2Name = "backup2"
+const (
+	primaryName = "primary"
+	backup1Name = "backup1"
+	backup2Name = "backup2"
+)
 
-var readingErr = fmt.Errorf("error!")
+var errReading = errors.New("error")
 
 type testSensors struct {
 	primary *inject.Sensor
@@ -81,10 +84,8 @@ func TestNewFailoverSensor(t *testing.T) {
 			test.That(t, fs.primary, test.ShouldResemble, testPrimary)
 			test.That(t, fs.backups, test.ShouldResemble, []sensor.Sensor{testBackup1, testBackup2})
 			test.That(t, fs.timeout, test.ShouldEqual, 1)
-
 		})
 	}
-
 }
 
 func TestReadings(t *testing.T) {
@@ -130,7 +131,7 @@ func TestReadings(t *testing.T) {
 				},
 			},
 			primaryReading:  nil,
-			primaryErr:      readingErr,
+			primaryErr:      errReading,
 			backup1Reading:  map[string]interface{}{"a": 1},
 			expectedReading: map[string]interface{}{"a": 1},
 			expectErr:       false,
@@ -145,8 +146,8 @@ func TestReadings(t *testing.T) {
 					Timeout: 1,
 				},
 			},
-			primaryErr:      readingErr,
-			backup1Err:      readingErr,
+			primaryErr:      errReading,
+			backup1Err:      errReading,
 			backup2Reading:  map[string]interface{}{"a": 2},
 			expectedReading: map[string]interface{}{"a": 2},
 			expectErr:       false,
@@ -161,9 +162,9 @@ func TestReadings(t *testing.T) {
 					Timeout: 1,
 				},
 			},
-			primaryErr: readingErr,
-			backup1Err: readingErr,
-			backup2Err: readingErr,
+			primaryErr: errReading,
+			backup1Err: errReading,
+			backup2Err: errReading,
 			expectErr:  true,
 		},
 		{
@@ -185,7 +186,6 @@ func TestReadings(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-
 		s, err := newFailoverSensor(ctx, deps, tc.config, logger)
 		test.That(t, err, test.ShouldBeNil)
 
@@ -211,7 +211,5 @@ func TestReadings(t *testing.T) {
 			test.That(t, reading, test.ShouldResemble, tc.expectedReading)
 		}
 		s.Close(ctx)
-
 	}
-
 }
