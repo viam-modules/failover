@@ -164,6 +164,7 @@ func (s *failoverSensor) Readings(ctx context.Context, extra map[string]interfac
 	}
 
 	for _, backup := range s.backups {
+		// Lock the mutex to protect s.lastWorkingSensor from changing before the readings call finishes.
 		s.mu.Lock()
 		defer s.mu.Unlock()
 		// if the last working sensor is a backup, it was already tried above.
