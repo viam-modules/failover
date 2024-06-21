@@ -183,7 +183,9 @@ func (s *failoverSensor) Name() resource.Name {
 
 // Close closes the sensor.
 func (s *failoverSensor) Close(ctx context.Context) error {
-	s.workers.Stop()
+	if s.workers != nil {
+		s.workers.Stop()
+	}
 	return nil
 }
 
@@ -194,12 +196,15 @@ func (s *failoverSensor) DoCommand(ctx context.Context, cmd map[string]interface
 
 // pollPrimaryForHealth starts a background routine that continuously polls the primary sensor until it returns a reading.
 func (s *failoverSensor) pollPrimaryForHealth(extra map[string]interface{}) {
+	// poll every 10 ms.
+	ticker := time.NewTicker(time.Millisecond * 10)
 	s.workers = rdkutils.NewStoppableWorkers(func(ctx context.Context) {
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			default:
+			case <-ticker.C:
+				fmt.Println("here")
 				_, err := s.tryReadingOrFail(ctx, s.primary, extra)
 				if err == nil {
 					s.logger.Infof("successfully got reading from primary sensor")
