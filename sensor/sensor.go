@@ -18,8 +18,7 @@ import (
 
 var (
 	// Model defines triplet name.
-	Model            = resource.NewModel("viam", "failover", "sensor")
-	errUnimplemented = errors.New("unimplemented")
+	Model = resource.NewModel("viam", "failover", "sensor")
 )
 
 func init() {
@@ -44,11 +43,6 @@ func (cfg Config) Validate(path string) ([]string, error) {
 		return nil, utils.NewConfigValidationFieldRequiredError(path, "primary")
 	}
 	deps = append(deps, cfg.Primary)
-
-	if len(cfg.Backups) == 0 {
-		return nil, utils.NewConfigValidationFieldRequiredError(path, "backups")
-	}
-
 	deps = append(deps, cfg.Backups...)
 
 	return deps, nil
@@ -109,16 +103,19 @@ type failoverSensor struct {
 	lastWorkingSensor sensor.Sensor
 }
 
+// Go does not allow channels containing a tuple,
+// so defining the struct with readings and error
+// to send through a channel.
 type readingsResult struct {
-	reading map[string]interface{}
-	err     error
+	readings map[string]interface{}
+	err      error
 }
 
 func getReading(ctx context.Context, sensor resource.Sensor, extra map[string]interface{}) readingsResult {
 	readings, err := sensor.Readings(ctx, extra)
 	return readingsResult{
-		reading: readings,
-		err:     err,
+		readings: readings,
+		err:      err,
 	}
 }
 
@@ -134,7 +131,7 @@ func (s *failoverSensor) tryReadingOrFail(ctx context.Context, sensor sensor.Sen
 		if result.err != nil {
 			return nil, fmt.Errorf("sensor %s failed to get readings: %s", sensor.Name(), result.err.Error())
 		} else {
-			return result.reading, nil
+			return result.readings, nil
 		}
 	}
 }
@@ -190,8 +187,7 @@ func (s *failoverSensor) Close(ctx context.Context) error {
 }
 
 func (s *failoverSensor) DoCommand(ctx context.Context, cmd map[string]interface{}) (map[string]interface{}, error) {
-	s.logger.Error("DoCommand method unimplemented")
-	return nil, errUnimplemented
+	return nil, errors.ErrUnsupported
 }
 
 // pollPrimaryForHealth starts a background routine that continuously polls the primary sensor until it returns a reading.
@@ -204,7 +200,6 @@ func (s *failoverSensor) pollPrimaryForHealth(extra map[string]interface{}) {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				fmt.Println("here")
 				_, err := s.tryReadingOrFail(ctx, s.primary, extra)
 				if err == nil {
 					s.logger.Infof("successfully got reading from primary sensor")
