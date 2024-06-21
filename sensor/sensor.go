@@ -13,6 +13,7 @@ import (
 	"go.viam.com/rdk/components/sensor"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
+	rdkutils "go.viam.com/rdk/utils"
 )
 
 var (
@@ -56,23 +57,15 @@ func (cfg Config) Validate(path string) ([]string, error) {
 func newFailoverSensor(ctx context.Context, deps resource.Dependencies, conf resource.Config, logger logging.Logger) (
 	sensor.Sensor, error,
 ) {
-
-	fmt.Println("RECONGURING")
 	config, err := resource.NativeConfig[Config](conf)
 	if err != nil {
 		return nil, err
 	}
 
-	cancelCtx, cancelFunc := context.WithCancel(context.Background())
-
 	s := &failoverSensor{
-		name:       conf.ResourceName(),
-		logger:     logger,
-		cancelCtx:  cancelCtx,
-		cancelFunc: cancelFunc,
+		name:   conf.ResourceName(),
+		logger: logger,
 	}
-
-	fmt.Println("RECONGURING HERE")
 
 	primary, err := sensor.FromDependencies(deps, config.Primary)
 	if err != nil {
@@ -80,8 +73,6 @@ func newFailoverSensor(ctx context.Context, deps resource.Dependencies, conf res
 	}
 	s.primary = primary
 	s.backups = []sensor.Sensor{}
-
-	fmt.Println("RECONGURING HERE 2")
 
 	for _, backup := range config.Backups {
 		backup, err := sensor.FromDependencies(deps, backup)
@@ -108,8 +99,7 @@ type failoverSensor struct {
 	logger logging.Logger
 	name   resource.Name
 
-	cancelCtx  context.Context
-	cancelFunc func()
+	workers rdkutils.StoppableWorkers
 
 	primary sensor.Sensor
 	backups []sensor.Sensor
@@ -117,8 +107,6 @@ type failoverSensor struct {
 
 	mu                sync.Mutex
 	lastWorkingSensor sensor.Sensor
-
-	activeBackgroundWorkers sync.WaitGroup
 }
 
 type readingsResult struct {
@@ -161,8 +149,7 @@ func (s *failoverSensor) Readings(ctx context.Context, extra map[string]interfac
 	// if the primary failed, start goroutine to check for it to get readings again.
 	switch s.lastWorkingSensor {
 	case s.primary:
-		s.activeBackgroundWorkers.Add(1)
-		s.pollPrimaryForHealth(s.cancelCtx, extra)
+		s.pollPrimaryForHealth(extra)
 	default:
 	}
 
@@ -196,8 +183,7 @@ func (s *failoverSensor) Name() resource.Name {
 
 // Close closes the sensor.
 func (s *failoverSensor) Close(ctx context.Context) error {
-	s.cancelFunc()
-	s.activeBackgroundWorkers.Wait()
+	s.workers.Stop()
 	return nil
 }
 
@@ -207,8 +193,8 @@ func (s *failoverSensor) DoCommand(ctx context.Context, cmd map[string]interface
 }
 
 // pollPrimaryForHealth starts a background routine that continuously polls the primary sensor until it returns a reading.
-func (s *failoverSensor) pollPrimaryForHealth(ctx context.Context, extra map[string]interface{}) {
-	utils.ManagedGo(func() {
+func (s *failoverSensor) pollPrimaryForHealth(extra map[string]interface{}) {
+	s.workers = rdkutils.NewStoppableWorkers(func(ctx context.Context) {
 		for {
 			select {
 			case <-ctx.Done():
@@ -224,5 +210,5 @@ func (s *failoverSensor) pollPrimaryForHealth(ctx context.Context, extra map[str
 				}
 			}
 		}
-	}, s.activeBackgroundWorkers.Done)
+	})
 }
