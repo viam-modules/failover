@@ -23,7 +23,7 @@ var (
 
 func init() {
 	resource.RegisterComponent(sensor.API, Model,
-		resource.Registration[sensor.Sensor, *Config]{
+		resource.Registration[sensor.Sensor, Config]{
 			Constructor: newFailoverSensor,
 		},
 	)
@@ -37,7 +37,7 @@ type Config struct {
 }
 
 // Validate performs config validation.
-func (cfg *Config) Validate(path string) ([]string, error) {
+func (cfg Config) Validate(path string) ([]string, error) {
 	var deps []string
 	if cfg.Primary == "" {
 		return nil, utils.NewConfigValidationFieldRequiredError(path, "primary")
@@ -53,10 +53,12 @@ func (cfg *Config) Validate(path string) ([]string, error) {
 	return deps, nil
 }
 
-func newFailoverSensor(ctx context.Context, deps resource.Dependencies, rawConf resource.Config, logger logging.Logger) (
+func newFailoverSensor(ctx context.Context, deps resource.Dependencies, conf resource.Config, logger logging.Logger) (
 	sensor.Sensor, error,
 ) {
-	conf, err := resource.NativeConfig[*Config](rawConf)
+
+	fmt.Println("RECONGURING")
+	config, err := resource.NativeConfig[Config](conf)
 	if err != nil {
 		return nil, err
 	}
@@ -64,21 +66,24 @@ func newFailoverSensor(ctx context.Context, deps resource.Dependencies, rawConf 
 	cancelCtx, cancelFunc := context.WithCancel(context.Background())
 
 	s := &failoverSensor{
-		name:       rawConf.ResourceName(),
+		name:       conf.ResourceName(),
 		logger:     logger,
-		cfg:        conf,
 		cancelCtx:  cancelCtx,
 		cancelFunc: cancelFunc,
 	}
 
-	primary, err := sensor.FromDependencies(deps, conf.Primary)
+	fmt.Println("RECONGURING HERE")
+
+	primary, err := sensor.FromDependencies(deps, config.Primary)
 	if err != nil {
 		return nil, err
 	}
 	s.primary = primary
 	s.backups = []sensor.Sensor{}
 
-	for _, backup := range conf.Backups {
+	fmt.Println("RECONGURING HERE 2")
+
+	for _, backup := range config.Backups {
 		backup, err := sensor.FromDependencies(deps, backup)
 		if err != nil {
 			return nil, err
@@ -90,18 +95,18 @@ func newFailoverSensor(ctx context.Context, deps resource.Dependencies, rawConf 
 
 	// default timeout is 1 second.
 	s.timeout = 1000
-	if conf.Timeout > 0 {
-		s.timeout = conf.Timeout
+	if config.Timeout > 0 {
+		s.timeout = config.Timeout
 	}
 
 	return s, nil
 }
 
 type failoverSensor struct {
-	name resource.Name
 	resource.AlwaysRebuild
+
 	logger logging.Logger
-	cfg    *Config
+	name   resource.Name
 
 	cancelCtx  context.Context
 	cancelFunc func()
@@ -114,10 +119,6 @@ type failoverSensor struct {
 	lastWorkingSensor sensor.Sensor
 
 	activeBackgroundWorkers sync.WaitGroup
-}
-
-func (s *failoverSensor) Name() resource.Name {
-	return s.name
 }
 
 type readingsResult struct {
@@ -157,20 +158,22 @@ func (s *failoverSensor) Readings(ctx context.Context, extra map[string]interfac
 	}
 	s.logger.Warnf(err.Error())
 
-	// primary failed, start goroutine to check for it to get readings again.
-	if s.lastWorkingSensor == s.primary {
+	// if the primary failed, start goroutine to check for it to get readings again.
+	switch s.lastWorkingSensor {
+	case s.primary:
 		s.activeBackgroundWorkers.Add(1)
 		s.pollPrimaryForHealth(s.cancelCtx, extra)
+	default:
 	}
 
 	for _, backup := range s.backups {
-		// Lock the mutex to protect s.lastWorkingSensor from changing before the readings call finishes.
+		// Lock the mutex to protect lastWorkingSensor from changing before the readings call finishes.
 		s.mu.Lock()
-		defer s.mu.Unlock()
 		// if the last working sensor is a backup, it was already tried above.
 		if s.lastWorkingSensor == backup {
 			continue
 		}
+		s.mu.Unlock()
 		s.logger.Infof("calling backup %s", backup.Name())
 		reading, err := s.tryReadingOrFail(ctx, backup, extra)
 		if err != nil {
@@ -184,18 +187,23 @@ func (s *failoverSensor) Readings(ctx context.Context, extra map[string]interfac
 		}
 	}
 	// couldn't get reading from any sensors.
-	return nil, fmt.Errorf("failover %s: all sensors failed to get readings", s.Name())
+	return nil, fmt.Errorf("failover %s: all sensors failed to get readings", s.name)
 }
 
-func (s *failoverSensor) DoCommand(ctx context.Context, cmd map[string]interface{}) (map[string]interface{}, error) {
-	s.logger.Error("DoCommand method unimplemented")
-	return nil, errUnimplemented
+func (s *failoverSensor) Name() resource.Name {
+	return s.name
 }
 
 // Close closes the sensor.
 func (s *failoverSensor) Close(ctx context.Context) error {
 	s.cancelFunc()
+	s.activeBackgroundWorkers.Wait()
 	return nil
+}
+
+func (s *failoverSensor) DoCommand(ctx context.Context, cmd map[string]interface{}) (map[string]interface{}, error) {
+	s.logger.Error("DoCommand method unimplemented")
+	return nil, errUnimplemented
 }
 
 // pollPrimaryForHealth starts a background routine that continuously polls the primary sensor until it returns a reading.
