@@ -3,7 +3,6 @@ package failoversensor
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -43,6 +42,11 @@ func (cfg Config) Validate(path string) ([]string, error) {
 		return nil, utils.NewConfigValidationFieldRequiredError(path, "primary")
 	}
 	deps = append(deps, cfg.Primary)
+
+	if len(cfg.Backups) == 0 {
+		return nil, utils.NewConfigValidationFieldRequiredError(path, "backups")
+	}
+
 	deps = append(deps, cfg.Backups...)
 
 	return deps, nil
@@ -57,7 +61,7 @@ func newFailoverSensor(ctx context.Context, deps resource.Dependencies, conf res
 	}
 
 	s := &failoverSensor{
-		name:   conf.ResourceName(),
+		Named:  conf.ResourceName().AsNamed(),
 		logger: logger,
 	}
 
@@ -89,10 +93,9 @@ func newFailoverSensor(ctx context.Context, deps resource.Dependencies, conf res
 
 type failoverSensor struct {
 	resource.AlwaysRebuild
+	resource.Named
 
-	logger logging.Logger
-	name   resource.Name
-
+	logger  logging.Logger
 	workers rdkutils.StoppableWorkers
 
 	primary sensor.Sensor
@@ -171,11 +174,7 @@ func (s *failoverSensor) Readings(ctx context.Context, extra map[string]interfac
 		}
 	}
 	// couldn't get reading from any sensors.
-	return nil, fmt.Errorf("failover %s: all sensors failed to get readings", s.name)
-}
-
-func (s *failoverSensor) Name() resource.Name {
-	return s.name
+	return nil, fmt.Errorf("failover %s: all sensors failed to get readings", s.Named)
 }
 
 // Close closes the sensor.
@@ -184,10 +183,6 @@ func (s *failoverSensor) Close(ctx context.Context) error {
 		s.workers.Stop()
 	}
 	return nil
-}
-
-func (s *failoverSensor) DoCommand(ctx context.Context, cmd map[string]interface{}) (map[string]interface{}, error) {
-	return nil, errors.ErrUnsupported
 }
 
 // pollPrimaryForHealth starts a background routine that continuously polls the primary sensor until it returns a reading.
