@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"failover/common"
+
 	"go.viam.com/utils"
 
 	"go.viam.com/rdk/components/sensor"
@@ -61,8 +63,9 @@ func newFailoverSensor(ctx context.Context, deps resource.Dependencies, conf res
 	}
 
 	s := &failoverSensor{
-		Named:  conf.ResourceName().AsNamed(),
-		logger: logger,
+		Named:   conf.ResourceName().AsNamed(),
+		logger:  logger,
+		workers: rdkutils.NewStoppableWorkers(),
 	}
 
 	primary, err := sensor.FromDependencies(deps, config.Primary)
@@ -107,51 +110,15 @@ type failoverSensor struct {
 	lastWorkingSensor sensor.Sensor
 }
 
-// Go does not allow channels containing a tuple,
-// so defining the struct with readings and error
-// to send through a channel.
-type readingsResult struct {
-	readings map[string]interface{}
-	err      error
-}
-
-func getReading(ctx context.Context, sensor resource.Sensor, extra map[string]interface{}) readingsResult {
-	readings, err := sensor.Readings(ctx, extra)
-	return readingsResult{
-		readings: readings,
-		err:      err,
-	}
-}
-
-func (s *failoverSensor) tryReadingOrFail(ctx context.Context, sensor sensor.Sensor, extra map[string]interface{}) (map[string]interface{}, error) {
-	resultChan := make(chan readingsResult, 1)
-	go func() {
-		resultChan <- getReading(ctx, sensor, extra)
-	}()
-	select {
-	case <-time.After(time.Duration(s.timeout * 1e6)):
-		return nil, fmt.Errorf("%s timed out", sensor.Name())
-	case result := <-resultChan:
-		if result.err != nil {
-			return nil, fmt.Errorf("sensor %s failed to get readings: %w", sensor.Name(), result.err)
-		} else {
-			return result.readings, nil
-		}
-	}
-}
-
 func (s *failoverSensor) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
-	// Poll the last sensor we know is working
-	reading, err := s.tryReadingOrFail(ctx, s.lastWorkingSensor, extra)
-	if reading != nil {
-		return reading, nil
-	}
-	// upon error of the last working sensor, log returned error.
-	s.logger.Warnf(err.Error())
 
-	// Lock the mutex to protect lastWorkingSensor from changing before the readings call finishes.
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	// Poll the last sensor we know is working
+	readings, err := common.TryReadingOrFail(ctx, s.timeout, s.lastWorkingSensor, s.lastWorkingSensor.Readings, extra)
+	if readings != nil {
+		return readings, nil
+	}
+	// upon error of the last working sensor, logthe  error.
+	s.logger.Warnf(err.Error())
 
 	// If the primary failed, start goroutine to check for it to get readings again.
 	switch s.lastWorkingSensor {
@@ -162,6 +129,17 @@ func (s *failoverSensor) Readings(ctx context.Context, extra map[string]interfac
 	default:
 	}
 
+	readings, err = s.tryBackups(ctx, extra)
+	if err != nil {
+		return nil, err
+	}
+	return readings, nil
+}
+
+func (s *failoverSensor) tryBackups(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
+	// Lock the mutex to protect lastWorkingSensor from changing before the readings call finishes.
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	// Start reading from the list of backup sensors until one succeeds.
 	for _, backup := range s.backups {
 		// if the last working sensor is a backup, it was already tried above.
@@ -169,7 +147,7 @@ func (s *failoverSensor) Readings(ctx context.Context, extra map[string]interfac
 			continue
 		}
 		s.logger.Infof("calling backup %s", backup.Name())
-		reading, err := s.tryReadingOrFail(ctx, backup, extra)
+		reading, err := common.TryReadingOrFail(ctx, s.timeout, backup, backup.Readings, extra)
 		if err != nil {
 			s.logger.Warn(err.Error())
 		} else {
@@ -178,7 +156,6 @@ func (s *failoverSensor) Readings(ctx context.Context, extra map[string]interfac
 			return reading, nil
 		}
 	}
-	// couldn't get reading from any sensors.
 	return nil, fmt.Errorf("all sensors failed to get readings")
 }
 
@@ -186,13 +163,13 @@ func (s *failoverSensor) Readings(ctx context.Context, extra map[string]interfac
 func (s *failoverSensor) pollPrimaryForHealth(extra map[string]interface{}) {
 	// poll every 10 ms.
 	ticker := time.NewTicker(time.Millisecond * 10)
-	s.workers = rdkutils.NewStoppableWorkers(func(ctx context.Context) {
+	s.workers.AddWorkers(func(ctx context.Context) {
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				_, err := s.tryReadingOrFail(ctx, s.primary, extra)
+				_, err := common.TryReadingOrFail(ctx, s.timeout, s.primary, s.primary.Readings, extra)
 				if err == nil {
 					s.logger.Infof("successfully got reading from primary sensor")
 					s.mu.Lock()

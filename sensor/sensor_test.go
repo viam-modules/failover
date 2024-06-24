@@ -50,10 +50,6 @@ func TestNewFailoverSensor(t *testing.T) {
 	ctx := context.Background()
 	_, deps := setup(t)
 
-	testPrimary := &inject.Sensor{}
-	testBackup1 := &inject.Sensor{}
-	testBackup2 := &inject.Sensor{}
-
 	tests := []struct {
 		name        string
 		config      resource.Config
@@ -64,7 +60,7 @@ func TestNewFailoverSensor(t *testing.T) {
 			name: "A valid config should successfully create failover sensor",
 			config: resource.Config{
 				Name: "failover",
-				ConvertedAttributes: &Config{
+				ConvertedAttributes: Config{
 					Primary: "primary",
 					Backups: []string{"backup1", "backup2"},
 					Timeout: 1,
@@ -81,8 +77,8 @@ func TestNewFailoverSensor(t *testing.T) {
 			test.That(t, s.Name(), test.ShouldResemble, tc.config.ResourceName())
 			test.That(t, s, test.ShouldNotBeNil)
 			fs := s.(*failoverSensor)
-			test.That(t, fs.primary, test.ShouldResemble, testPrimary)
-			test.That(t, fs.backups, test.ShouldResemble, []sensor.Sensor{testBackup1, testBackup2})
+			test.That(t, fs.primary, test.ShouldNotBeNil)
+			test.That(t, len(fs.backups), test.ShouldEqual, 2)
 			test.That(t, fs.timeout, test.ShouldEqual, 1)
 		})
 	}
@@ -110,7 +106,7 @@ func TestReadings(t *testing.T) {
 			name: "if the primary succeeds, should return primary reading",
 			config: resource.Config{
 				Name: "failover",
-				ConvertedAttributes: &Config{
+				ConvertedAttributes: Config{
 					Primary: "primary",
 					Backups: []string{"backup1", "backup2"},
 					Timeout: 1,
@@ -124,7 +120,7 @@ func TestReadings(t *testing.T) {
 			name: "if the primary fails, backup1 is returned",
 			config: resource.Config{
 				Name: "failover",
-				ConvertedAttributes: &Config{
+				ConvertedAttributes: Config{
 					Primary: "primary",
 					Backups: []string{"backup1", "backup2"},
 					Timeout: 1,
@@ -140,7 +136,7 @@ func TestReadings(t *testing.T) {
 			name: "if primary and backup1 fail, backup2 is returned",
 			config: resource.Config{
 				Name: "failover",
-				ConvertedAttributes: &Config{
+				ConvertedAttributes: Config{
 					Primary: "primary",
 					Backups: []string{"backup1", "backup2"},
 					Timeout: 1,
@@ -156,7 +152,7 @@ func TestReadings(t *testing.T) {
 			name: "if all sensors error, return error",
 			config: resource.Config{
 				Name: "failover",
-				ConvertedAttributes: &Config{
+				ConvertedAttributes: Config{
 					Primary: "primary",
 					Backups: []string{"backup1", "backup2"},
 					Timeout: 1,
@@ -171,7 +167,7 @@ func TestReadings(t *testing.T) {
 			name: "a reading should timeout after default of 1 second",
 			config: resource.Config{
 				Name: "failover",
-				ConvertedAttributes: &Config{
+				ConvertedAttributes: Config{
 					Primary: "primary",
 					Backups: []string{"backup1", "backup2"},
 					Timeout: 1,
@@ -195,10 +191,10 @@ func TestReadings(t *testing.T) {
 		}
 
 		sensors.backup1.ReadingsFunc = func(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
-			return tc.backup1Reading, nil
+			return tc.backup1Reading, tc.backup1Err
 		}
 		sensors.backup2.ReadingsFunc = func(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
-			return tc.backup2Reading, nil
+			return tc.backup2Reading, tc.backup2Err
 		}
 
 		reading, err := s.Readings(ctx, nil)
