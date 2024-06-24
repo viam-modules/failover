@@ -92,6 +92,9 @@ func newFailoverSensor(ctx context.Context, deps resource.Dependencies, conf res
 		s.timeout = config.Timeout
 	}
 
+	// Start goroutine to wait for primary to fail and poll for it to come back online.
+	s.pollPrimaryForHealth()
+	s.pollPrimary = make(chan bool)
 	return s, nil
 }
 
@@ -108,6 +111,8 @@ type failoverSensor struct {
 
 	mu                sync.Mutex
 	lastWorkingSensor sensor.Sensor
+
+	pollPrimary chan bool
 }
 
 func (s *failoverSensor) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
@@ -120,12 +125,10 @@ func (s *failoverSensor) Readings(ctx context.Context, extra map[string]interfac
 	// upon error of the last working sensor, logthe  error.
 	s.logger.Warnf(err.Error())
 
-	// If the primary failed, start goroutine to check for it to get readings again.
+	// If the primary failed, tell the goroutine to start checking the health.
 	switch s.lastWorkingSensor {
 	case s.primary:
-		// Check if the primary comes back online and replace the lastWorkingSensor
-		// with primary when it does.
-		s.pollPrimaryForHealth(extra)
+		s.pollPrimary <- true
 	default:
 	}
 
@@ -159,23 +162,32 @@ func (s *failoverSensor) tryBackups(ctx context.Context, extra map[string]interf
 	return nil, fmt.Errorf("all sensors failed to get readings")
 }
 
-// pollPrimaryForHealth starts a background routine that continuously polls the primary sensor until it returns a reading.
-func (s *failoverSensor) pollPrimaryForHealth(extra map[string]interface{}) {
+// pollPrimaryForHealth starts a background routine that waits for data to come into pollPrimary channel,
+// then continuously polls the primary sensor until it returns a reading, and replaces lastWorkingSensor.
+func (s *failoverSensor) pollPrimaryForHealth() {
 	// poll every 10 ms.
 	ticker := time.NewTicker(time.Millisecond * 10)
 	s.workers.AddWorkers(func(ctx context.Context) {
 		for {
 			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				_, err := common.TryReadingOrFail(ctx, s.timeout, s.primary, s.primary.Readings, extra)
-				if err == nil {
-					s.logger.Infof("successfully got reading from primary sensor")
-					s.mu.Lock()
-					s.lastWorkingSensor = s.primary
-					s.mu.Unlock()
+			// wait for data to come into the channel before polling.
+			case <-s.pollPrimary:
+			}
+			// label for loop so we can break out of it later.
+		L:
+			for {
+				select {
+				case <-ctx.Done():
 					return
+				case <-ticker.C:
+					_, err := common.TryReadingOrFail(ctx, s.timeout, s.primary, s.primary.Readings, nil)
+					if err == nil {
+						s.logger.Infof("successfully got reading from primary sensor")
+						s.mu.Lock()
+						s.lastWorkingSensor = s.primary
+						s.mu.Unlock()
+						break L
+					}
 				}
 			}
 		}
