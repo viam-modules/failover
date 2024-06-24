@@ -3,6 +3,7 @@ package failoversensor
 import (
 	"context"
 	"errors"
+	"failover/common"
 	"testing"
 	"time"
 
@@ -60,7 +61,7 @@ func TestNewFailoverSensor(t *testing.T) {
 			name: "A valid config should successfully create failover sensor",
 			config: resource.Config{
 				Name: "failover",
-				ConvertedAttributes: Config{
+				ConvertedAttributes: common.Config{
 					Primary: "primary",
 					Backups: []string{"backup1", "backup2"},
 					Timeout: 1,
@@ -106,7 +107,7 @@ func TestReadings(t *testing.T) {
 			name: "if the primary succeeds, should return primary reading",
 			config: resource.Config{
 				Name: "failover",
-				ConvertedAttributes: Config{
+				ConvertedAttributes: common.Config{
 					Primary: "primary",
 					Backups: []string{"backup1", "backup2"},
 					Timeout: 1,
@@ -120,7 +121,7 @@ func TestReadings(t *testing.T) {
 			name: "if the primary fails, backup1 is returned",
 			config: resource.Config{
 				Name: "failover",
-				ConvertedAttributes: Config{
+				ConvertedAttributes: common.Config{
 					Primary: "primary",
 					Backups: []string{"backup1", "backup2"},
 					Timeout: 1,
@@ -136,7 +137,7 @@ func TestReadings(t *testing.T) {
 			name: "if primary and backup1 fail, backup2 is returned",
 			config: resource.Config{
 				Name: "failover",
-				ConvertedAttributes: Config{
+				ConvertedAttributes: common.Config{
 					Primary: "primary",
 					Backups: []string{"backup1", "backup2"},
 					Timeout: 1,
@@ -152,7 +153,7 @@ func TestReadings(t *testing.T) {
 			name: "if all sensors error, return error",
 			config: resource.Config{
 				Name: "failover",
-				ConvertedAttributes: Config{
+				ConvertedAttributes: common.Config{
 					Primary: "primary",
 					Backups: []string{"backup1", "backup2"},
 					Timeout: 1,
@@ -167,7 +168,7 @@ func TestReadings(t *testing.T) {
 			name: "a reading should timeout after default of 1 second",
 			config: resource.Config{
 				Name: "failover",
-				ConvertedAttributes: Config{
+				ConvertedAttributes: common.Config{
 					Primary: "primary",
 					Backups: []string{"backup1", "backup2"},
 					Timeout: 1,

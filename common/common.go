@@ -7,17 +7,42 @@ import (
 	"time"
 
 	"go.viam.com/rdk/components/sensor"
+	"go.viam.com/utils"
 )
+
+// Config is used for converting config attributes.
+type Config struct {
+	Primary string   `json:"primary"`
+	Backups []string `json:"backups"`
+	Timeout int      `json:"timeout_ms,omitempty"`
+}
+
+// Validate performs config validation.
+func (cfg Config) Validate(path string) ([]string, error) {
+	var deps []string
+	if cfg.Primary == "" {
+		return nil, utils.NewConfigValidationFieldRequiredError(path, "primary")
+	}
+	deps = append(deps, cfg.Primary)
+
+	if len(cfg.Backups) == 0 {
+		return nil, utils.NewConfigValidationFieldRequiredError(path, "backups")
+	}
+
+	deps = append(deps, cfg.Backups...)
+
+	return deps, nil
+}
 
 // Go does not allow channels containing a tuple,
 // so defining the struct with readings and error
 // to send through a channel.
 type ReadingsResult struct {
-	readings interface{}
+	readings any
 	err      error
 }
 
-func getReading[K interface{}](ctx context.Context, call func(context.Context, map[string]interface{}) (K, error), extra map[string]interface{}) ReadingsResult {
+func getReading[K any](ctx context.Context, call func(context.Context, map[string]interface{}) (K, error), extra map[string]interface{}) ReadingsResult {
 	readings, err := call(ctx, extra)
 
 	return ReadingsResult{
@@ -26,7 +51,7 @@ func getReading[K interface{}](ctx context.Context, call func(context.Context, m
 	}
 }
 
-func TryReadingOrFail[K interface{}](ctx context.Context,
+func TryReadingOrFail[K any](ctx context.Context,
 	timeout int,
 	s sensor.Sensor,
 	call func(context.Context, map[string]interface{}) (K, error),

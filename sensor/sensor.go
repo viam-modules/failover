@@ -9,8 +9,6 @@ import (
 
 	"failover/common"
 
-	"go.viam.com/utils"
-
 	"go.viam.com/rdk/components/sensor"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
@@ -24,40 +22,16 @@ var (
 
 func init() {
 	resource.RegisterComponent(sensor.API, Model,
-		resource.Registration[sensor.Sensor, Config]{
+		resource.Registration[sensor.Sensor, common.Config]{
 			Constructor: newFailoverSensor,
 		},
 	)
 }
 
-// Config is used for converting config attributes.
-type Config struct {
-	Primary string   `json:"primary"`
-	Backups []string `json:"backups"`
-	Timeout int      `json:"timeout_ms,omitempty"`
-}
-
-// Validate performs config validation.
-func (cfg Config) Validate(path string) ([]string, error) {
-	var deps []string
-	if cfg.Primary == "" {
-		return nil, utils.NewConfigValidationFieldRequiredError(path, "primary")
-	}
-	deps = append(deps, cfg.Primary)
-
-	if len(cfg.Backups) == 0 {
-		return nil, utils.NewConfigValidationFieldRequiredError(path, "backups")
-	}
-
-	deps = append(deps, cfg.Backups...)
-
-	return deps, nil
-}
-
 func newFailoverSensor(ctx context.Context, deps resource.Dependencies, conf resource.Config, logger logging.Logger) (
 	sensor.Sensor, error,
 ) {
-	config, err := resource.NativeConfig[Config](conf)
+	config, err := resource.NativeConfig[common.Config](conf)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +97,7 @@ func (s *failoverSensor) Readings(ctx context.Context, extra map[string]interfac
 		return readings, nil
 	}
 	// upon error of the last working sensor, logthe  error.
-	s.logger.Warnf(err.Error())
+	s.logger.Warn(err.Error())
 
 	// If the primary failed, tell the goroutine to start checking the health.
 	switch s.lastWorkingSensor {
@@ -196,6 +170,7 @@ func (s *failoverSensor) pollPrimaryForHealth() {
 
 // Close closes the sensor.
 func (s *failoverSensor) Close(ctx context.Context) error {
+	close(s.pollPrimary)
 	if s.workers != nil {
 		s.workers.Stop()
 	}
