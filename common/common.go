@@ -4,9 +4,12 @@ package common
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"go.viam.com/rdk/components/sensor"
+	"go.viam.com/rdk/logging"
+	rdkutils "go.viam.com/rdk/utils"
 	"go.viam.com/utils"
 )
 
@@ -42,6 +45,42 @@ type ReadingsResult struct {
 	err      error
 }
 
+// PowerSensor has special case since some of the functions returns 3 values.
+func getPSReading[K any, R any](ctx context.Context, call func(context.Context, map[string]interface{}) (K, R, error), extra map[string]interface{}) ReadingsResult {
+	reading1, reading2, err := call(ctx, extra)
+
+	readings := map[string]interface{}{"1": reading1, "2": reading2}
+
+	return ReadingsResult{
+		readings: readings,
+		err:      err,
+	}
+}
+
+func TryReadingOrFail2Returns[K any, R any](ctx context.Context,
+	timeout int,
+	s sensor.Sensor,
+	call func(context.Context, map[string]interface{}) (K, R, error),
+	extra map[string]interface{}) (
+	K, error) {
+
+	resultChan := make(chan ReadingsResult, 1)
+	var zero K
+	go func() {
+		resultChan <- getPSReading(ctx, call, extra)
+	}()
+	select {
+	case <-time.After(time.Duration(timeout) * time.Millisecond):
+		return zero, fmt.Errorf("%s timed out", s.Name())
+	case result := <-resultChan:
+		if result.err != nil {
+			return zero, fmt.Errorf("sensor %s failed to get readings: %w", s.Name(), result.err)
+		} else {
+			return result.readings.(K), nil
+		}
+	}
+}
+
 func getReading[K any](ctx context.Context, call func(context.Context, map[string]interface{}) (K, error), extra map[string]interface{}) ReadingsResult {
 	readings, err := call(ctx, extra)
 
@@ -73,4 +112,14 @@ func TryReadingOrFail[K any](ctx context.Context,
 			return result.readings.(K), nil
 		}
 	}
+}
+
+type Failover struct {
+	Logger  logging.Logger
+	Workers rdkutils.StoppableWorkers
+
+	Timeout int
+
+	Mu                sync.Mutex
+	LastWorkingSensor sensor.Sensor
 }
