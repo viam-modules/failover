@@ -144,6 +144,8 @@ func (s *failoverSensor) pollPrimaryForHealth() {
 	s.workers.AddWorkers(func(ctx context.Context) {
 		for {
 			select {
+			case <-ctx.Done():
+				return
 			// wait for data to come into the channel before polling.
 			case <-s.pollPrimary:
 			}
