@@ -71,18 +71,35 @@ func TestNewFailoverSensor(t *testing.T) {
 			},
 			deps: deps,
 		},
+		{
+			name: "config without dependencies should error",
+			config: resource.Config{
+				Name: "failover",
+				ConvertedAttributes: common.Config{
+					Primary: "primary",
+					Backups: []string{"backup1", "backup2"},
+					Timeout: 1,
+				},
+			},
+			expectedErr: errors.New("Resource missing from dependencies"),
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			s, err := newFailoverSensor(ctx, tc.deps, tc.config, logger)
-			test.That(t, err, test.ShouldBeNil)
-			test.That(t, s.Name(), test.ShouldResemble, tc.config.ResourceName())
-			test.That(t, s, test.ShouldNotBeNil)
-			fs := s.(*failoverSensor)
-			test.That(t, fs.primary, test.ShouldNotBeNil)
-			test.That(t, len(fs.backups), test.ShouldEqual, 2)
-			test.That(t, fs.timeout, test.ShouldEqual, 1)
+			if tc.expectedErr != nil {
+				test.That(t, err, test.ShouldNotBeNil)
+				test.That(t, err.Error(), test.ShouldContainSubstring, tc.expectedErr.Error())
+			} else {
+				test.That(t, err, test.ShouldBeNil)
+				test.That(t, s, test.ShouldNotBeNil)
+				test.That(t, s.Name(), test.ShouldResemble, tc.config.ResourceName())
+				fs := s.(*failoverSensor)
+				test.That(t, fs.primary, test.ShouldNotBeNil)
+				test.That(t, len(fs.backups), test.ShouldEqual, 2)
+				test.That(t, fs.timeout, test.ShouldEqual, 1)
+			}
 		})
 	}
 }
