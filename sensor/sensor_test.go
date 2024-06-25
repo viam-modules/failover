@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"failover/common"
+	"fmt"
+	"runtime"
 	"testing"
 	"time"
 
@@ -175,7 +177,7 @@ func TestReadings(t *testing.T) {
 				},
 			},
 			primaryReading:     map[string]interface{}{"a": 1},
-			primaryTimeSeconds: 2,
+			primaryTimeSeconds: 1,
 			backup1Reading:     map[string]interface{}{"a": 2},
 			expectedReading:    map[string]interface{}{"a": 2},
 			expectErr:          false,
@@ -183,6 +185,8 @@ func TestReadings(t *testing.T) {
 	}
 
 	for _, tc := range tests {
+		goRoutinesStart := runtime.NumGoroutine()
+		fmt.Println(tc.name)
 		s, err := newFailoverSensor(ctx, deps, tc.config, logger)
 		test.That(t, err, test.ShouldBeNil)
 
@@ -207,6 +211,12 @@ func TestReadings(t *testing.T) {
 			test.That(t, err, test.ShouldBeNil)
 			test.That(t, reading, test.ShouldResemble, tc.expectedReading)
 		}
-		s.Close(ctx)
+
+		err = s.Close(ctx)
+		test.That(t, err, test.ShouldBeNil)
+		time.Sleep(1 * time.Second)
+		goRoutinesEnd := runtime.NumGoroutine()
+		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
+
 	}
 }
