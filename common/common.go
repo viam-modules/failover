@@ -56,31 +56,31 @@ func getPSReading[K any, R any](ctx context.Context, call func(context.Context, 
 	}
 }
 
-func TryReadingOrFail2Returns[K any, R any](ctx context.Context,
-	timeout int,
-	s sensor.Sensor,
-	call func(context.Context, map[string]interface{}) (K, R, error),
-	extra map[string]interface{}) (
-	K, R, error) {
+// func TryReadingOrFail2Returns[K any, R any](ctx context.Context,
+// 	timeout int,
+// 	s sensor.Sensor,
+// 	call func(context.Context, map[string]interface{}) (K, R, error),
+// 	extra map[string]interface{}) (
+// 	K, R, error) {
 
-	resultChan := make(chan ReadingsResult, 1)
-	var zeroK K
-	var zeroR R
-	go func() {
-		resultChan <- getPSReading(ctx, call, extra)
-	}()
-	select {
-	case <-time.After(time.Duration(timeout) * time.Millisecond):
-		return zeroK, zeroR, fmt.Errorf("%s timed out", s.Name())
-	case result := <-resultChan:
-		if result.err != nil {
-			return zeroK, zeroR, fmt.Errorf("sensor %s failed to get readings: %w", s.Name(), result.err)
-		} else {
-			readings := result.readings.(map[string]interface{})
-			return readings["1"].(K), readings["2"].(R), nil
-		}
-	}
-}
+// 	resultChan := make(chan ReadingsResult, 1)
+// 	var zeroK K
+// 	var zeroR R
+// 	go func() {
+// 		resultChan <- getPSReading(ctx, call, extra)
+// 	}()
+// 	select {
+// 	case <-time.After(time.Duration(timeout) * time.Millisecond):
+// 		return zeroK, zeroR, fmt.Errorf("%s timed out", s.Name())
+// 	case result := <-resultChan:
+// 		if result.err != nil {
+// 			return zeroK, zeroR, fmt.Errorf("sensor %s failed to get readings: %w", s.Name(), result.err)
+// 		} else {
+// 			readings := result.readings.(map[string]interface{})
+// 			return readings["1"].(K), readings["2"].(R), nil
+// 		}
+// 	}
+// }
 
 func getReading[K any](ctx context.Context, call func(context.Context, resource.Sensor, map[string]interface{}) (K, error), sensor resource.Sensor, extra map[string]interface{}) ReadingsResult {
 	reading, err := call(ctx, sensor, extra)
@@ -105,10 +105,10 @@ func TryReadingOrFail[K any](ctx context.Context,
 	}()
 	select {
 	case <-time.After(time.Duration(timeout) * time.Millisecond):
-		return zero, fmt.Errorf("%s timed out", "name")
+		return zero, errors.New("sensor timed out")
 	case result := <-resultChan:
 		if result.err != nil {
-			return zero, fmt.Errorf("sensor %s failed to get readings: %w", "name", result.err)
+			return zero, fmt.Errorf("failed to get readings: %w", "name", result.err)
 		} else {
 			return result.readings.(K), nil
 		}

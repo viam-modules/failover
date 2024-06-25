@@ -3,7 +3,6 @@ package powersensor
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"go.viam.com/rdk/components/powersensor"
 	"go.viam.com/rdk/components/sensor"
@@ -59,7 +58,6 @@ func ReadingsWrapper(ctx context.Context, ps resource.Sensor, extra map[string]i
 	if !ok {
 		return nil, errors.New("failed")
 	}
-	fmt.Println("HERE")
 	readings, err := powersensor.Readings(ctx, extra)
 	if err != nil {
 		return nil, err

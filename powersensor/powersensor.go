@@ -2,6 +2,7 @@ package powersensor
 
 import (
 	"context"
+	"errors"
 	"failover/common"
 	"fmt"
 	"sync"
@@ -99,11 +100,12 @@ func newFailoverPowerSensor(ctx context.Context, deps resource.Dependencies, con
 func (ps *failoverPowerSensor) Voltage(ctx context.Context, extra map[string]interface{}) (float64, bool, error) {
 	// Poll the last sensor we know is working
 	voltage, err := common.TryReadingOrFail(ctx, ps.timeout, ps.lastWorkingSensor, VoltageWrapper, extra)
-	if voltage != 0 {
-		return voltage, false, nil
+	if err == nil {
+		_, isAc, _ := ps.lastWorkingSensor.Voltage(ctx, extra)
+		return voltage, isAc, nil
 	}
-	// upon error of the last working sensor, logthe  error.
-	ps.logger.Warn(err.Error())
+	// upon error of the last working sensor, log the error.
+	ps.logger.Warnf("powersensor %s failed: %w", ps.lastWorkingSensor.Name(), error.Error(err))
 
 	// If the primary failed, tell the goroutine to start checking the health.
 	switch ps.lastWorkingSensor {
@@ -116,18 +118,21 @@ func (ps *failoverPowerSensor) Voltage(ctx context.Context, extra map[string]int
 	if err != nil {
 		return 0, false, err
 	}
-	return volts, true, nil
+
+	_, isAc, _ := ps.lastWorkingSensor.Voltage(ctx, extra)
+	return volts, isAc, nil
 }
 
 // Current returns the current reading in amperes and a bool returning true if the current is AC.
 func (ps *failoverPowerSensor) Current(ctx context.Context, extra map[string]interface{}) (float64, bool, error) {
 	// Poll the last sensor we know is working
-	readings, err := common.TryReadingOrFail[float64](ctx, ps.timeout, ps.lastWorkingSensor, CurrentWrapper, extra)
-	if readings != 0 {
-		return readings, true, err
+	amps, err := common.TryReadingOrFail[float64](ctx, ps.timeout, ps.lastWorkingSensor, CurrentWrapper, extra)
+	if err == nil {
+		_, isAc, _ := ps.lastWorkingSensor.Current(ctx, extra)
+		return amps, isAc, err
 	}
-	// upon error of the last working sensor, logthe  error.
-	ps.logger.Warn(err.Error())
+	// upon error of the last working sensor, log the error.
+	ps.logger.Warnf("powersensor %s failed: %w", ps.lastWorkingSensor.Name(), error.Error(err))
 
 	// If the primary failed, tell the goroutine to start checking the health.
 	switch ps.lastWorkingSensor {
@@ -136,22 +141,25 @@ func (ps *failoverPowerSensor) Current(ctx context.Context, extra map[string]int
 	default:
 	}
 
-	readings, err = tryBackups(ctx, ps, CurrentWrapper, extra)
+	amps, err = tryBackups(ctx, ps, CurrentWrapper, extra)
 	if err != nil {
-		return 0, false, fmt.Errorf("all sensors failed to get power")
+		return 0, false, err
 	}
-	return readings, true, nil
+
+	// get the bool vlaue from the working sensor.
+	_, isAc, _ := ps.lastWorkingSensor.Current(ctx, extra)
+	return amps, isAc, nil
 }
 
 // Power returns the power reading in watts.
 func (ps *failoverPowerSensor) Power(ctx context.Context, extra map[string]interface{}) (float64, error) {
 	// Poll the last sensor we know is working
-	readings, err := common.TryReadingOrFail(ctx, ps.timeout, ps.lastWorkingSensor, PowerWrapper, extra)
-	if readings != 0 {
-		return readings, nil
+	watts, err := common.TryReadingOrFail(ctx, ps.timeout, ps.lastWorkingSensor, PowerWrapper, extra)
+	if err == nil {
+		return watts, nil
 	}
-	// upon error of the last working sensor, logthe  error.
-	ps.logger.Warn(err.Error())
+	// upon error of the last working sensor, log the error.
+	ps.logger.Warnf("powersensor %s failed: %w", ps.lastWorkingSensor.Name(), error.Error(err))
 
 	// If the primary failed, tell the goroutine to start checking the health.
 	switch ps.lastWorkingSensor {
@@ -160,11 +168,11 @@ func (ps *failoverPowerSensor) Power(ctx context.Context, extra map[string]inter
 	default:
 	}
 
-	readings, err = tryBackups(ctx, ps, PowerWrapper, extra)
+	watts, err = tryBackups(ctx, ps, PowerWrapper, extra)
 	if err != nil {
 		return 0, err
 	}
-	return readings, nil
+	return watts, nil
 }
 
 func (ps *failoverPowerSensor) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
@@ -173,8 +181,8 @@ func (ps *failoverPowerSensor) Readings(ctx context.Context, extra map[string]in
 	if readings != nil {
 		return readings, nil
 	}
-	// upon error of the last working sensor, log the  error.
-	ps.logger.Warn(err.Error())
+	// upon error of the last working sensor, log the error.
+	ps.logger.Warnf("powersensor %s failed: %s", ps.lastWorkingSensor.Name().ShortName(), error.Error(err))
 
 	// If the primary failed, tell the goroutine to start checking the health.
 	switch ps.lastWorkingSensor {
@@ -185,7 +193,7 @@ func (ps *failoverPowerSensor) Readings(ctx context.Context, extra map[string]in
 
 	readings, err = tryBackups[map[string]interface{}](ctx, ps, ReadingsWrapper, extra)
 	if err != nil {
-		return nil, fmt.Errorf("all sensors failed to get power")
+		return nil, errors.New("all power sensors failed to get readings")
 	}
 	return readings, nil
 
@@ -223,6 +231,8 @@ func PollPrimaryForHealth[K any](s *failoverPowerSensor, startChan chan bool, ca
 		for {
 			select {
 			// wait for data to come into the channel before polling.
+			case <-ctx.Done():
+				return
 			case <-startChan:
 			}
 			// label for loop so we can break out of it later.
@@ -248,13 +258,12 @@ func PollPrimaryForHealth[K any](s *failoverPowerSensor, startChan chan bool, ca
 
 func (s *failoverPowerSensor) Close(context.Context) error {
 
+	if s.workers != nil {
+		s.workers.Stop()
+	}
 	close(s.pollCurrentChan)
 	close(s.pollPowerChan)
 	close(s.pollVoltageChan)
 	close(s.pollReadingsChan)
-
-	if s.workers != nil {
-		s.workers.Stop()
-	}
 	return nil
 }
