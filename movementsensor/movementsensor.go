@@ -2,6 +2,8 @@ package movementsensor
 
 import (
 	"context"
+	"failover/common"
+	"fmt"
 
 	"github.com/golang/geo/r3"
 	geo "github.com/kellydunn/golang-geo"
@@ -10,9 +12,10 @@ import (
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/spatialmath"
+	"go.viam.com/utils"
 )
 
-var Model = resource.NewModel("viam", "failover", " movementsensor")
+var Model = resource.NewModel("viam", "failover", "movementsensor")
 
 func init() {
 	resource.RegisterComponent(movementsensor.API, Model,
@@ -23,19 +26,25 @@ func init() {
 }
 
 type Config struct {
-	// Put config attributes here
-
-	/* if your model  does not need a config,
-	   replace *Config on line 13 with resource.NoNativeConfig */
-
-	/* Uncomment this if your model does not need to be validated
-	   and has no implicit dependecies. */
-	// resource.TriviallyValidateConfig
+	Primary string   `json:"primary"`
+	Backups []string `json:"backups"`
+	Timeout int      `json:"timeout_ms,omitempty"`
 }
 
 func (cfg *Config) Validate(path string) ([]string, error) {
-	// Add config validation code here
-	return nil, nil
+	var deps []string
+	if cfg.Primary == "" {
+		return nil, utils.NewConfigValidationFieldRequiredError(path, "primary")
+	}
+	deps = append(deps, cfg.Primary)
+
+	if len(cfg.Backups) == 0 {
+		return nil, utils.NewConfigValidationFieldRequiredError(path, "backups")
+	}
+
+	deps = append(deps, cfg.Backups...)
+
+	return deps, nil
 }
 
 type failovermovementsensor struct {
@@ -46,13 +55,13 @@ type failovermovementsensor struct {
 
 	cancelCtx  context.Context
 	cancelFunc func()
+	resource.TriviallyReconfigurable
 
-	/* Uncomment this if your model does not need to reconfigure. */
-	// resource.TriviallyReconfigurable
+	lastWorkingSensor movementsensor.MovementSensor
+	primary           movementsensor.MovementSensor
+	backups           []movementsensor.MovementSensor
 
-	// Uncomment this if the model does not have any goroutines that
-	// need to be shut down while closing.
-	// resource.TriviallyCloseable
+	timeout int
 }
 
 func newfailovermovementsensor(ctx context.Context, deps resource.Dependencies, rawConf resource.Config, logger logging.Logger) (movementsensor.MovementSensor, error) {
@@ -70,6 +79,31 @@ func newfailovermovementsensor(ctx context.Context, deps resource.Dependencies, 
 		cancelCtx:  cancelCtx,
 		cancelFunc: cancelFunc,
 	}
+
+	primary, err := movementsensor.FromDependencies(deps, conf.Primary)
+	if err != nil {
+		return nil, err
+	}
+	s.primary = primary
+	s.backups = []movementsensor.MovementSensor{}
+
+	for _, backup := range conf.Backups {
+		backup, err := movementsensor.FromDependencies(deps, backup)
+		if err != nil {
+			s.logger.Errorf(err.Error())
+		} else {
+			s.backups = append(s.backups, backup)
+		}
+	}
+
+	s.lastWorkingSensor = primary
+
+	// default timeout is 1 second.
+	s.timeout = 1000
+	if conf.Timeout > 0 {
+		s.timeout = conf.Timeout
+	}
+
 	return s, nil
 }
 
@@ -87,7 +121,37 @@ func (s *failovermovementsensor) Position(ctx context.Context, extra map[string]
 }
 
 func (s *failovermovementsensor) LinearVelocity(ctx context.Context, extra map[string]interface{}) (r3.Vector, error) {
-	return r3.Vector{}, nil
+	// Poll the last sensor we know is working
+
+	reading, err := common.TryReadingOrFail[r3.Vector](ctx, s.timeout, s.lastWorkingSensor, s.lastWorkingSensor.LinearVelocity, extra)
+	if err == nil {
+		return reading, nil
+	}
+	// upon error of the last working sensor, log returned error.
+	s.logger.Warnf(err.Error())
+
+	// If the primary failed, start goroutine to check for it to get readings again.
+
+	// Start reading from the list of backup sensors until one succeeds.
+	for _, backup := range s.backups {
+		// if the last working sensor is a backup, it was already tried above.
+		if s.lastWorkingSensor == backup {
+			continue
+		}
+		s.logger.Infof("calling backup %s", backup.Name())
+		// dont pass backup, pass name or name as string
+		// pass in API call as string
+		reading, err := common.TryReadingOrFail(ctx, s.timeout, backup, backup.LinearVelocity, extra)
+		if err != nil {
+			s.logger.Warn(err.Error())
+		} else {
+			s.logger.Infof("successfully got reading from %s", backup.Name())
+			s.lastWorkingSensor = backup
+			return reading, nil
+		}
+	}
+	// couldn't get reading from any sensors.
+	return r3.Vector{}, fmt.Errorf("all sensors failed to get readings")
 }
 
 func (s *failovermovementsensor) AngularVelocity(ctx context.Context, extra map[string]interface{}) (spatialmath.AngularVelocity, error) {
@@ -107,7 +171,8 @@ func (s *failovermovementsensor) Orientation(ctx context.Context, extra map[stri
 }
 
 func (s *failovermovementsensor) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
-	return nil, nil
+	l, _ := s.LinearVelocity(ctx, extra)
+	return map[string]interface{}{"linear": l}, nil
 }
 
 func (s *failovermovementsensor) Accuracy(ctx context.Context, extra map[string]interface{}) (*movementsensor.Accuracy, error,
@@ -116,7 +181,12 @@ func (s *failovermovementsensor) Accuracy(ctx context.Context, extra map[string]
 }
 
 func (s *failovermovementsensor) Properties(ctx context.Context, extra map[string]interface{}) (*movementsensor.Properties, error) {
-	return nil, nil
+	return &movementsensor.Properties{
+		PositionSupported:       true,
+		OrientationSupported:    true,
+		CompassHeadingSupported: true,
+		LinearVelocitySupported: true,
+	}, nil
 }
 
 func (s *failovermovementsensor) DoCommand(ctx context.Context, cmd map[string]interface{}) (map[string]interface{}, error) {

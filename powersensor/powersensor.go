@@ -96,12 +96,91 @@ func newFailoverPowerSensor(ctx context.Context, deps resource.Dependencies, con
 
 }
 
-func (s *failoverPowerSensor) Voltage(ctx context.Context, extra map[string]interface{}) (float64, bool, error) {
+// this DOESNT WORK BC THE PARAMETERS ARENT THE Same as ORHERS FOR GENERIC FUNC
+// func VoltageWrapper(ctx context.Context,  ps powersensor.PowerSensorextra map[string]interface{}) (float64, error) {
+// 	volts, _, err := ps.Voltage(ctx, extra)
+// 	if err != nil {
+// 		return 0, err
+// 	}
+
+// 	return volts, err
+// }
+
+// func CurrentWrapper(ctx context.Context, ps powersensor.PowerSensor, extra map[string]interface{}) (float64, error) {
+// 	amps, _, err := ps.Current(ctx, extra)
+// 	if err != nil {
+// 		return 0, err
+// 	}
+
+// 	return amps, err
+// }
+
+func (ps *failoverPowerSensor) Voltage(ctx context.Context, extra map[string]interface{}) (float64, bool, error) {
+	// Poll the last sensor we know is working
+	voltage, isAc, err := common.TryReadingOrFail2Returns(ctx, ps.timeout, ps.lastWorkingSensor, ps.lastWorkingSensor.Voltage, extra)
+	if voltage != 0 {
+		return voltage, isAc, nil
+	}
+	// upon error of the last working sensor, logthe  error.
+	ps.logger.Warn(err.Error())
+
+	// If the primary failed, tell the goroutine to start checking the health.
+	switch ps.lastWorkingSensor {
+	case ps.primary:
+		ps.pollPowerChan <- true
+	default:
+	}
+
+	for _, backup := range ps.backups {
+		// if the last working sensor is a backup, it was already tried above.
+		if ps.lastWorkingSensor == backup {
+			continue
+		}
+		ps.logger.Infof("calling backup %s", backup.Name())
+		voltage, isAc, err := common.TryReadingOrFail2Returns(ctx, ps.timeout, backup, backup.Voltage, extra)
+		if err != nil {
+			ps.logger.Warn(err.Error())
+		} else {
+			ps.logger.Infof("successfully got reading from %s", backup.Name())
+			ps.lastWorkingSensor = backup
+			return voltage, isAc, nil
+		}
+	}
 	return 0, false, nil
 }
 
 // Current returns the current reading in amperes and a bool returning true if the current is AC.
-func (s *failoverPowerSensor) Current(ctx context.Context, extra map[string]interface{}) (float64, bool, error) {
+func (ps *failoverPowerSensor) Current(ctx context.Context, extra map[string]interface{}) (float64, bool, error) {
+	// Poll the last sensor we know is working
+	current, isAc, err := common.TryReadingOrFail2Returns(ctx, ps.timeout, ps.lastWorkingSensor, ps.lastWorkingSensor.Current, extra)
+	if current != 0 {
+		return current, isAc, nil
+	}
+	// upon error of the last working sensor, logthe  error.
+	ps.logger.Warn(err.Error())
+
+	// If the primary failed, tell the goroutine to start checking the health.
+	switch ps.lastWorkingSensor {
+	case ps.primary:
+		ps.pollPowerChan <- true
+	default:
+	}
+
+	for _, backup := range ps.backups {
+		// if the last working sensor is a backup, it was already tried above.
+		if ps.lastWorkingSensor == backup {
+			continue
+		}
+		ps.logger.Infof("calling backup %s", backup.Name())
+		current, isAc, err := common.TryReadingOrFail2Returns(ctx, ps.timeout, backup, backup.Current, extra)
+		if err != nil {
+			ps.logger.Warn(err.Error())
+		} else {
+			ps.logger.Infof("successfully got reading from %s", backup.Name())
+			ps.lastWorkingSensor = backup
+			return current, isAc, nil
+		}
+	}
 	return 0, false, nil
 }
 
@@ -122,15 +201,56 @@ func (ps *failoverPowerSensor) Power(ctx context.Context, extra map[string]inter
 	default:
 	}
 
-	readings, err = tryBackups(ctx, ps, ps.Power, extra)
-	if err != nil {
-		return 0, err
+	for _, backup := range ps.backups {
+		// if the last working sensor is a backup, it was already tried above.
+		if ps.lastWorkingSensor == backup {
+			continue
+		}
+		ps.logger.Infof("calling backup %s", backup.Name())
+		reading, err := common.TryReadingOrFail(ctx, ps.timeout, backup, backup.Power, extra)
+		if err != nil {
+			ps.logger.Warn(err.Error())
+		} else {
+			ps.logger.Infof("successfully got reading from %s", backup.Name())
+			ps.lastWorkingSensor = backup
+			return reading, nil
+		}
 	}
 	return readings, nil
 }
 
-func (s *failoverPowerSensor) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
-	return nil, nil
+func (ps *failoverPowerSensor) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
+	// Poll the last sensor we know is working
+	readings, err := common.TryReadingOrFail(ctx, ps.timeout, ps.lastWorkingSensor, ps.lastWorkingSensor.Readings, extra)
+	if readings != nil {
+		return readings, nil
+	}
+	// upon error of the last working sensor, logthe  error.
+	ps.logger.Warn(err.Error())
+
+	// If the primary failed, tell the goroutine to start checking the health.
+	switch ps.lastWorkingSensor {
+	case ps.primary:
+		ps.pollPowerChan <- true
+	default:
+	}
+
+	for _, backup := range ps.backups {
+		// if the last working sensor is a backup, it was already tried above.
+		if ps.lastWorkingSensor == backup {
+			continue
+		}
+		ps.logger.Infof("calling backup %s", backup.Name())
+		reading, err := common.TryReadingOrFail(ctx, ps.timeout, backup, backup.Readings, extra)
+		if err != nil {
+			ps.logger.Warn(err.Error())
+		} else {
+			ps.logger.Infof("successfully got reading from %s", backup.Name())
+			ps.lastWorkingSensor = backup
+			return reading, nil
+		}
+	}
+	return readings, nil
 }
 
 func (s *failoverPowerSensor) Close(context.Context) error {
@@ -213,7 +333,7 @@ func PollPrimaryForHealth2[K any, R any](s *failoverPowerSensor, startChan chan 
 				case <-ctx.Done():
 					return
 				case <-ticker.C:
-					_, err := common.TryReadingOrFail2Returns(ctx, s.timeout, s.primary, call, nil)
+					_, _, err := common.TryReadingOrFail2Returns(ctx, s.timeout, s.primary, call, nil)
 					if err == nil {
 						s.logger.Infof("successfully got reading from primary sensor")
 						s.mu.Lock()
