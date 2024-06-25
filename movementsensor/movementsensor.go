@@ -2,7 +2,6 @@ package movementsensor
 
 import (
 	"context"
-	"failover/common"
 	"fmt"
 
 	"github.com/golang/geo/r3"
@@ -123,34 +122,34 @@ func (s *failovermovementsensor) Position(ctx context.Context, extra map[string]
 func (s *failovermovementsensor) LinearVelocity(ctx context.Context, extra map[string]interface{}) (r3.Vector, error) {
 	// Poll the last sensor we know is working
 
-	reading, err := common.TryReadingOrFail[r3.Vector](ctx, s.timeout, s.lastWorkingSensor, s.lastWorkingSensor.LinearVelocity, extra)
-	if err == nil {
-		return reading, nil
-	}
-	// upon error of the last working sensor, log returned error.
-	s.logger.Warnf(err.Error())
+	// reading, err := common.TryReadingOrFail[r3.Vector](ctx, s.timeout, s.lastWorkingSensor, s.lastWorkingSensor.LinearVelocity, extra)
+	// if err == nil {
+	// 	return reading, nil
+	// }
+	// // upon error of the last working sensor, log returned error.
+	// s.logger.Warnf(err.Error())
 
-	// If the primary failed, start goroutine to check for it to get readings again.
+	// // If the primary failed, start goroutine to check for it to get readings again.
 
-	// Start reading from the list of backup sensors until one succeeds.
-	for _, backup := range s.backups {
-		// if the last working sensor is a backup, it was already tried above.
-		if s.lastWorkingSensor == backup {
-			continue
-		}
-		s.logger.Infof("calling backup %s", backup.Name())
-		// dont pass backup, pass name or name as string
-		// pass in API call as string
-		reading, err := common.TryReadingOrFail(ctx, s.timeout, backup, backup.LinearVelocity, extra)
-		if err != nil {
-			s.logger.Warn(err.Error())
-		} else {
-			s.logger.Infof("successfully got reading from %s", backup.Name())
-			s.lastWorkingSensor = backup
-			return reading, nil
-		}
-	}
-	// couldn't get reading from any sensors.
+	// // Start reading from the list of backup sensors until one succeeds.
+	// for _, backup := range s.backups {
+	// 	// if the last working sensor is a backup, it was already tried above.
+	// 	if s.lastWorkingSensor == backup {
+	// 		continue
+	// 	}
+	// 	s.logger.Infof("calling backup %s", backup.Name())
+	// 	// dont pass backup, pass name or name as string
+	// 	// pass in API call as string
+	// 	reading, err := common.TryReadingOrFail(ctx, s.timeout, backup, backup.LinearVelocity, extra)
+	// 	if err != nil {
+	// 		s.logger.Warn(err.Error())
+	// 	} else {
+	// 		s.logger.Infof("successfully got reading from %s", backup.Name())
+	// 		s.lastWorkingSensor = backup
+	// 		return reading, nil
+	// 	}
+	// }
+	// // couldn't get reading from any sensors.
 	return r3.Vector{}, fmt.Errorf("all sensors failed to get readings")
 }
 

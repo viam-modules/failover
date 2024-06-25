@@ -3,13 +3,12 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"sync"
 	"time"
 
 	"go.viam.com/rdk/components/sensor"
-	"go.viam.com/rdk/logging"
-	rdkutils "go.viam.com/rdk/utils"
+	"go.viam.com/rdk/resource"
 	"go.viam.com/utils"
 )
 
@@ -57,73 +56,76 @@ func getPSReading[K any, R any](ctx context.Context, call func(context.Context, 
 	}
 }
 
-// func TryReadingOrFail2Returns[K any, R any](ctx context.Context,
-// 	timeout int,
-// 	s sensor.Sensor,
-// 	call func(context.Context, map[string]interface{}) (K, R, error),
-// 	extra map[string]interface{}) (
-// 	K, R, error) {
+func TryReadingOrFail2Returns[K any, R any](ctx context.Context,
+	timeout int,
+	s sensor.Sensor,
+	call func(context.Context, map[string]interface{}) (K, R, error),
+	extra map[string]interface{}) (
+	K, R, error) {
 
-// 	resultChan := make(chan ReadingsResult, 1)
-// 	var zeroK K
-// 	var zeroR R
-// 	go func() {
-// 		resultChan <- getPSReading(ctx, call, extra)
-// 	}()
-// 	select {
-// 	case <-time.After(time.Duration(timeout) * time.Millisecond):
-// 		return zeroK, zeroR, fmt.Errorf("%s timed out", s.Name())
-// 	case result := <-resultChan:
-// 		if result.err != nil {
-// 			return zeroK, zeroR, fmt.Errorf("sensor %s failed to get readings: %w", s.Name(), result.err)
-// 		} else {
-// 			readings := result.readings.(map[string]interface{})
-// 			return readings["1"].(K), readings["2"].(R), nil
-// 		}
-// 	}
-// }
+	resultChan := make(chan ReadingsResult, 1)
+	var zeroK K
+	var zeroR R
+	go func() {
+		resultChan <- getPSReading(ctx, call, extra)
+	}()
+	select {
+	case <-time.After(time.Duration(timeout) * time.Millisecond):
+		return zeroK, zeroR, fmt.Errorf("%s timed out", s.Name())
+	case result := <-resultChan:
+		if result.err != nil {
+			return zeroK, zeroR, fmt.Errorf("sensor %s failed to get readings: %w", s.Name(), result.err)
+		} else {
+			readings := result.readings.(map[string]interface{})
+			return readings["1"].(K), readings["2"].(R), nil
+		}
+	}
+}
 
-func getReading[K any](ctx context.Context, call func(context.Context, map[string]interface{}) (K, error), extra map[string]interface{}) ReadingsResult {
-	reading1, err := call(ctx, extra)
-
-	readings := map[string]interface{}{"1": reading1}
+func getReading[K any](ctx context.Context, call func(context.Context, resource.Sensor, map[string]interface{}) (K, error), sensor resource.Sensor, extra map[string]interface{}) ReadingsResult {
+	reading, err := call(ctx, sensor, extra)
 
 	return ReadingsResult{
-		readings: readings,
+		readings: reading,
 		err:      err,
 	}
 }
 
 func TryReadingOrFail[K any](ctx context.Context,
 	timeout int,
-	s sensor.Sensor,
-	call func(context.Context, map[string]interface{}) (K, error),
+	s resource.Sensor,
+	call func(context.Context, resource.Sensor, map[string]interface{}) (K, error),
 	extra map[string]interface{}) (
 	K, error) {
 
 	resultChan := make(chan ReadingsResult, 1)
 	var zero K
 	go func() {
-		resultChan <- getReading(ctx, call, extra)
+		resultChan <- getReading(ctx, call, s, extra)
 	}()
 	select {
 	case <-time.After(time.Duration(timeout) * time.Millisecond):
-		return zero, fmt.Errorf("%s timed out", s.Name())
+		return zero, fmt.Errorf("%s timed out", "name")
 	case result := <-resultChan:
 		if result.err != nil {
-			return zero, fmt.Errorf("sensor %s failed to get readings: %w", s.Name(), result.err)
+			return zero, fmt.Errorf("sensor %s failed to get readings: %w", "name", result.err)
 		} else {
 			return result.readings.(K), nil
 		}
 	}
 }
 
-type Failover struct {
-	Logger  logging.Logger
-	Workers rdkutils.StoppableWorkers
+// Since all sensors implement sensor readings can reuse the same wrapper.
+func ReadingsWrapper(ctx context.Context, ps resource.Sensor, extra map[string]interface{}) (map[string]interface{}, error) {
+	sensor, ok := ps.(sensor.Sensor)
+	if !ok {
+		return nil, errors.New("failed")
+	}
 
-	Timeout int
+	readings, err := sensor.Readings(ctx, extra)
+	if err != nil {
+		return nil, err
+	}
 
-	Mu                sync.Mutex
-	LastWorkingSensor sensor.Sensor
+	return readings, err
 }

@@ -3,6 +3,7 @@ package failoversensor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -26,6 +27,19 @@ func init() {
 			Constructor: newFailoverSensor,
 		},
 	)
+}
+
+func ReadingsWrapper(ctx context.Context, ps resource.Sensor, extra map[string]interface{}) (map[string]interface{}, error) {
+	sensor, ok := ps.(sensor.Sensor)
+	if !ok {
+		return nil, errors.New("failed")
+	}
+	readings, err := sensor.Readings(ctx, extra)
+	if err != nil {
+		return nil, err
+	}
+
+	return readings, err
 }
 
 func newFailoverSensor(ctx context.Context, deps resource.Dependencies, conf resource.Config, logger logging.Logger) (
@@ -92,7 +106,7 @@ type failoverSensor struct {
 func (s *failoverSensor) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
 
 	// Poll the last sensor we know is working
-	readings, err := common.TryReadingOrFail(ctx, s.timeout, s.lastWorkingSensor, s.lastWorkingSensor.Readings, extra)
+	readings, err := common.TryReadingOrFail(ctx, s.timeout, s.lastWorkingSensor, ReadingsWrapper, extra)
 	if readings != nil {
 		return readings, nil
 	}
@@ -124,7 +138,7 @@ func (s *failoverSensor) tryBackups(ctx context.Context, extra map[string]interf
 			continue
 		}
 		s.logger.Infof("calling backup %s", backup.Name())
-		reading, err := common.TryReadingOrFail(ctx, s.timeout, backup, backup.Readings, extra)
+		reading, err := common.TryReadingOrFail(ctx, s.timeout, backup, ReadingsWrapper, extra)
 		if err != nil {
 			s.logger.Warn(err.Error())
 		} else {
@@ -154,7 +168,7 @@ func (s *failoverSensor) pollPrimaryForHealth() {
 				case <-ctx.Done():
 					return
 				case <-ticker.C:
-					_, err := common.TryReadingOrFail(ctx, s.timeout, s.primary, s.primary.Readings, nil)
+					_, err := common.TryReadingOrFail(ctx, s.timeout, s.primary, ReadingsWrapper, nil)
 					if err == nil {
 						s.logger.Infof("successfully got reading from primary sensor")
 						s.mu.Lock()
