@@ -1,4 +1,4 @@
-package powersensor
+package failoverpowersensor
 
 import (
 	"context"
@@ -113,9 +113,9 @@ func (ps *failoverPowerSensor) Voltage(ctx context.Context, extra map[string]int
 	default:
 	}
 
-	readings, err = tryBackups(ctx, ps, CurrentWrapper, extra)
+	readings, err = tryBackups(ctx, ps, VoltageWrapper, extra)
 	if err != nil {
-		return 0, false, err
+		return 0, false, errors.New("all power sensors failed to get voltage")
 	}
 
 	return readings["volts"].(float64), readings["isAC"].(bool), nil
@@ -140,7 +140,7 @@ func (ps *failoverPowerSensor) Current(ctx context.Context, extra map[string]int
 
 	readings, err = tryBackups(ctx, ps, CurrentWrapper, extra)
 	if err != nil {
-		return 0, false, err
+		return 0, false, errors.New("all power sensors failed to get current")
 	}
 
 	return readings["amps"].(float64), readings["isAC"].(bool), nil
@@ -214,7 +214,7 @@ func tryBackups[T any](ctx context.Context, ps *failoverPowerSensor, call func(c
 			return reading, nil
 		}
 	}
-	return zero, fmt.Errorf("all sensors failed")
+	return zero, fmt.Errorf("all power sensors failed")
 }
 
 // pollPrimaryForHealth starts a background routine that waits for data to come into pollPrimary channel,

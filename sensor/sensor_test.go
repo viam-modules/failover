@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"failover/common"
-	"fmt"
 	"runtime"
 	"testing"
 	"time"
@@ -203,7 +202,6 @@ func TestReadings(t *testing.T) {
 
 	for _, tc := range tests {
 		goRoutinesStart := runtime.NumGoroutine()
-		fmt.Println(tc.name)
 		s, err := newFailoverSensor(ctx, deps, tc.config, logger)
 		test.That(t, err, test.ShouldBeNil)
 
