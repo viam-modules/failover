@@ -8,8 +8,8 @@ import (
 	"go.viam.com/rdk/resource"
 )
 
-// Wrapping all of powersensor APIs to return a map[string]interface{} of their return values.
-// This way, these wrappers can used as parameters in the generic functions.
+// Wrapping all of powersensor APIs to return a map[string]interface{} containing their return values.
+// This way, these wrappers can used as parameters in the generic helper functions.
 
 func VoltageWrapper(ctx context.Context, ps resource.Sensor, extra map[string]interface{}) (map[string]interface{}, error) {
 	powersensor, ok := ps.(powersensor.PowerSensor)

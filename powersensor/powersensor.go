@@ -194,7 +194,11 @@ func (ps *failoverPowerSensor) Readings(ctx context.Context, extra map[string]in
 
 }
 
-func tryBackups[T any](ctx context.Context, ps *failoverPowerSensor, call func(ctx context.Context, ps resource.Sensor, extra map[string]interface{}) (T, error), extra map[string]interface{}) (T, error) {
+func tryBackups[T any](ctx context.Context,
+	ps *failoverPowerSensor,
+	call func(ctx context.Context, ps resource.Sensor, extra map[string]interface{}) (T, error),
+	extra map[string]interface{}) (
+	T, error) {
 	// Lock the mutex to protect lastWorkingSensor from changing before the readings call finishes.
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
@@ -219,7 +223,9 @@ func tryBackups[T any](ctx context.Context, ps *failoverPowerSensor, call func(c
 
 // pollPrimaryForHealth starts a background routine that waits for data to come into pollPrimary channel,
 // then continuously polls the primary sensor until it returns a reading, and replaces lastWorkingSensor.
-func PollPrimaryForHealth[K any](s *failoverPowerSensor, startChan chan bool, call func(context.Context, resource.Sensor, map[string]interface{}) (K, error)) {
+func PollPrimaryForHealth[K any](s *failoverPowerSensor,
+	startChan chan bool,
+	call func(context.Context, resource.Sensor, map[string]interface{}) (K, error)) {
 	// poll every 10 ms.
 	ticker := time.NewTicker(time.Millisecond * 10)
 	s.workers.AddWorkers(func(ctx context.Context) {
