@@ -110,7 +110,7 @@ func (s *failoverSensor) Readings(ctx context.Context, extra map[string]interfac
 	if readings != nil {
 		return readings, nil
 	}
-	// upon error of the last working sensor, logthe  error.
+	// upon error of the last working sensor, log the error.
 	s.logger.Warn(err.Error())
 
 	// If the primary failed, tell the goroutine to start checking the health.
@@ -128,12 +128,12 @@ func (s *failoverSensor) Readings(ctx context.Context, extra map[string]interfac
 }
 
 func (s *failoverSensor) tryBackups(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
-	// Lock the mutex to protect lastWorkingSensor from changing before the readings call finishes.
+	// Lock the mutex to protect lastWorkingSensor from changing before this call finishes.
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	// Start reading from the list of backup sensors until one succeeds.
+	// call Readings from the list of backup sensors until one succeeds.
 	for _, backup := range s.backups {
-		// if the last working sensor is a backup, it was already tried above.
+		// if the last working sensor is a backup, it was already tried.
 		if s.lastWorkingSensor == backup {
 			continue
 		}
@@ -158,6 +158,8 @@ func (s *failoverSensor) pollPrimaryForHealth() {
 	s.workers.AddWorkers(func(ctx context.Context) {
 		for {
 			select {
+			case <-ctx.Done():
+				return
 			// wait for data to come into the channel before polling.
 			case <-s.pollPrimary:
 			}
