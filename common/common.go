@@ -91,3 +91,34 @@ func ReadingsWrapper(ctx context.Context, ps resource.Sensor, extra map[string]i
 	}
 	return readings, err
 }
+
+func GetReadingFromMap[T any](m map[string]interface{}, reading string) (T, error) {
+	var zero T
+	r, ok := m[reading]
+	if !ok {
+		return zero, errors.New("failed to get reading from map")
+	}
+	ret, ok := any(r).(T)
+	if !ok {
+		return zero, errors.New("reading failed type assertion")
+	}
+
+	return ret, nil
+}
+
+func Get2ReadingsFromMap[T any, R any](m map[string]interface{}, reading1 string, reading2 string) (T, R, error) {
+	var zeroT T
+	var zeroR R
+
+	ret1, err := GetReadingFromMap[T](m, reading1)
+	if err != nil {
+		return zeroT, zeroR, err
+	}
+
+	ret2, err := GetReadingFromMap[R](m, reading2)
+	if err != nil {
+		return zeroT, zeroR, err
+	}
+
+	return ret1, ret2, nil
+}
