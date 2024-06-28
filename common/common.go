@@ -44,7 +44,7 @@ type ReadingsResult struct {
 	err      error
 }
 
-// getReading calls the inputted API call and returns the reafing and error as a ReadingsResult struct.
+// getReading calls the inputted API call and returns the reading and error as a ReadingsResult struct.
 func getReading[K any](ctx context.Context, call func(context.Context, resource.Sensor, map[string]interface{}) (K, error), sensor resource.Sensor, extra map[string]interface{}) ReadingsResult {
 	reading, err := call(ctx, sensor, extra)
 
@@ -72,14 +72,14 @@ func TryReadingOrFail[K any](ctx context.Context,
 		return zero, errors.New("sensor timed out")
 	case result := <-resultChan:
 		if result.err != nil {
-			return zero, fmt.Errorf("failed to get readings: %s", result.err)
+			return zero, fmt.Errorf("failed to get readings: %w", result.err)
 		} else {
 			return result.readings.(K), nil
 		}
 	}
 }
 
-// Since all sensors implement sensor readings can reuse the same wrapper.
+// Since all sensors implement readings we can reuse the same wrapper for all models.
 func ReadingsWrapper(ctx context.Context, ps resource.Sensor, extra map[string]interface{}) (map[string]interface{}, error) {
 	sensor, ok := ps.(sensor.Sensor)
 	if !ok {
@@ -92,6 +92,7 @@ func ReadingsWrapper(ctx context.Context, ps resource.Sensor, extra map[string]i
 	return readings, err
 }
 
+// Helper function to get the reading from the map and convert is type.
 func GetReadingFromMap[T any](m map[string]interface{}, reading string) (T, error) {
 	var zero T
 	r, ok := m[reading]
