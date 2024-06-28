@@ -90,7 +90,6 @@ type failoverSensor struct {
 }
 
 func (s *failoverSensor) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
-
 	// Poll the last sensor we know is working
 	readings, err := common.TryReadingOrFail(ctx, s.timeout, s.lastWorkingSensor, common.ReadingsWrapper, extra)
 	if readings != nil {
