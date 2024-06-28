@@ -88,9 +88,9 @@ func newFailoverPowerSensor(ctx context.Context, deps resource.Dependencies, con
 	ps.pollPowerChan = make(chan bool)
 	ps.pollReadingsChan = make(chan bool)
 
-	PollPrimaryForHealth(ps, ps.pollVoltageChan, VoltageWrapper)
-	PollPrimaryForHealth(ps, ps.pollCurrentChan, CurrentWrapper)
-	PollPrimaryForHealth(ps, ps.pollPowerChan, PowerWrapper)
+	PollPrimaryForHealth(ps, ps.pollVoltageChan, voltageWrapper)
+	PollPrimaryForHealth(ps, ps.pollCurrentChan, currentWrapper)
+	PollPrimaryForHealth(ps, ps.pollPowerChan, powerWrapper)
 	PollPrimaryForHealth(ps, ps.pollReadingsChan, common.ReadingsWrapper)
 
 	return ps, nil
@@ -101,7 +101,7 @@ func (ps *failoverPowerSensor) Voltage(ctx context.Context, extra map[string]int
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
 	// Poll the last sensor we know is working
-	readings, err := common.TryReadingOrFail(ctx, ps.timeout, ps.lastWorkingSensor, VoltageWrapper, extra)
+	readings, err := common.TryReadingOrFail(ctx, ps.timeout, ps.lastWorkingSensor, voltageWrapper, extra)
 	if err == nil {
 		volts, isAC, err := common.Get2ReadingsFromMap[float64, bool](readings, "volts", "isAC")
 		if err == nil {
@@ -118,7 +118,7 @@ func (ps *failoverPowerSensor) Voltage(ctx context.Context, extra map[string]int
 	default:
 	}
 
-	readings, err = tryBackups(ctx, ps, VoltageWrapper, extra)
+	readings, err = tryBackups(ctx, ps, voltageWrapper, extra)
 	if err != nil {
 		return 0, false, errors.New("all power sensors failed to get voltage")
 	}
@@ -137,7 +137,7 @@ func (ps *failoverPowerSensor) Current(ctx context.Context, extra map[string]int
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
 	// Poll the last sensor we know is working
-	readings, err := common.TryReadingOrFail(ctx, ps.timeout, ps.lastWorkingSensor, CurrentWrapper, extra)
+	readings, err := common.TryReadingOrFail(ctx, ps.timeout, ps.lastWorkingSensor, currentWrapper, extra)
 	if err == nil {
 		current, isAC, err := common.Get2ReadingsFromMap[float64, bool](readings, "amps", "isAC")
 		if err == nil {
@@ -154,7 +154,7 @@ func (ps *failoverPowerSensor) Current(ctx context.Context, extra map[string]int
 	default:
 	}
 
-	readings, err = tryBackups(ctx, ps, CurrentWrapper, extra)
+	readings, err = tryBackups(ctx, ps, currentWrapper, extra)
 	if err != nil {
 		return 0, false, errors.New("all power sensors failed to get current")
 	}
@@ -172,7 +172,7 @@ func (ps *failoverPowerSensor) Power(ctx context.Context, extra map[string]inter
 	defer ps.mu.Unlock()
 
 	// Poll the last sensor we know is working
-	readings, err := common.TryReadingOrFail(ctx, ps.timeout, ps.lastWorkingSensor, PowerWrapper, extra)
+	readings, err := common.TryReadingOrFail(ctx, ps.timeout, ps.lastWorkingSensor, powerWrapper, extra)
 	if err == nil {
 		watts, err := common.GetReadingFromMap[float64](readings, "watts")
 		if err == nil {
@@ -189,7 +189,7 @@ func (ps *failoverPowerSensor) Power(ctx context.Context, extra map[string]inter
 	default:
 	}
 
-	readings, err = tryBackups(ctx, ps, PowerWrapper, extra)
+	readings, err = tryBackups(ctx, ps, powerWrapper, extra)
 	if err != nil {
 		return 0, errors.New("all power sensors failed to get power")
 	}
