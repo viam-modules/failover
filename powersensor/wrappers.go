@@ -11,7 +11,7 @@ import (
 // Wrapping all of powersensor APIs to return a map[string]interface{} containing their return values.
 // This way, these wrappers can used as parameters in the generic helper functions.
 
-func VoltageWrapper(ctx context.Context, ps resource.Sensor, extra map[string]interface{}) (map[string]interface{}, error) {
+func voltageWrapper(ctx context.Context, ps resource.Sensor, extra map[string]interface{}) (map[string]interface{}, error) {
 	powersensor, ok := ps.(powersensor.PowerSensor)
 	if !ok {
 		return nil, errors.New("type assertion to power sensor failed")
@@ -28,8 +28,7 @@ func VoltageWrapper(ctx context.Context, ps resource.Sensor, extra map[string]in
 	return m, nil
 }
 
-func CurrentWrapper(ctx context.Context, ps resource.Sensor, extra map[string]interface{}) (map[string]interface{}, error) {
-
+func currentWrapper(ctx context.Context, ps resource.Sensor, extra map[string]interface{}) (map[string]interface{}, error) {
 	powersensor, ok := ps.(powersensor.PowerSensor)
 	if !ok {
 		return nil, errors.New("type assertion to power sensor failed")
@@ -46,8 +45,7 @@ func CurrentWrapper(ctx context.Context, ps resource.Sensor, extra map[string]in
 	return m, nil
 }
 
-func PowerWrapper(ctx context.Context, ps resource.Sensor, extra map[string]interface{}) (map[string]interface{}, error) {
-
+func powerWrapper(ctx context.Context, ps resource.Sensor, extra map[string]interface{}) (map[string]interface{}, error) {
 	powersensor, ok := ps.(powersensor.PowerSensor)
 	if !ok {
 		return nil, errors.New("type assertion to power sensor failed")

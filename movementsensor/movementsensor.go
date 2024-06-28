@@ -6,6 +6,7 @@ import (
 	"failover/common"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/golang/geo/r3"
 	geo "github.com/kellydunn/golang-geo"
@@ -18,7 +19,7 @@ import (
 	rdkutils "go.viam.com/rdk/utils"
 )
 
-var Model = resource.NewModel("viam", "failover", "movementsensor")
+var Model = resource.NewModel("viam", "failover", " movementsensor")
 
 func init() {
 	resource.RegisterComponent(movementsensor.API, Model,
@@ -33,7 +34,14 @@ type failoverMovementSensor struct {
 	resource.Named
 
 	primary movementsensor.MovementSensor
-	backups []movementsensor.MovementSensor
+
+	positionBackups           []movementsensor.MovementSensor
+	linearVelocityBackups     []movementsensor.MovementSensor
+	angularVelocityBackups    []movementsensor.MovementSensor
+	orientationBackups        []movementsensor.MovementSensor
+	accuracyBackups           []movementsensor.MovementSensor
+	compassHeadingBackups     []movementsensor.MovementSensor
+	linearAccelerationBackups []movementsensor.MovementSensor
 
 	logger  logging.Logger
 	workers rdkutils.StoppableWorkers
@@ -43,10 +51,13 @@ type failoverMovementSensor struct {
 	mu                sync.Mutex
 	lastWorkingSensor movementsensor.MovementSensor
 
-	pollVoltageChan  chan bool
-	pollCurrentChan  chan bool
-	pollPowerChan    chan bool
-	pollReadingsChan chan bool
+	positionChan        chan bool
+	linearVelocityChan  chan bool
+	angularVelocityChan chan bool
+	orientationChan     chan bool
+	accuracyChan        chan bool
+	compassHeadingChan  chan bool
+	linearAccChan       chan bool
 }
 
 func newFailoverMovementSensor(ctx context.Context, deps resource.Dependencies, rawConf resource.Config, logger logging.Logger) (movementsensor.MovementSensor, error) {
@@ -64,14 +75,36 @@ func newFailoverMovementSensor(ctx context.Context, deps resource.Dependencies, 
 		return nil, err
 	}
 	s.primary = primary
-	s.backups = []movementsensor.MovementSensor{}
+	s.angularVelocityBackups = []movementsensor.MovementSensor{}
+	s.positionBackups = []movementsensor.MovementSensor{}
+	s.linearVelocityBackups = []movementsensor.MovementSensor{}
+	s.linearAccelerationBackups = []movementsensor.MovementSensor{}
+	s.compassHeadingBackups = []movementsensor.MovementSensor{}
 
 	for _, backup := range conf.Backups {
 		backup, err := movementsensor.FromDependencies(deps, backup)
+		props, err := backup.Properties(ctx, nil)
 		if err != nil {
 			s.logger.Errorf(err.Error())
 		} else {
-			s.backups = append(s.backups, backup)
+			if props.AngularVelocitySupported {
+				s.angularVelocityBackups = append(s.angularVelocityBackups, backup)
+			}
+			if props.PositionSupported {
+				s.positionBackups = append(s.positionBackups, backup)
+			}
+			if props.LinearAccelerationSupported {
+				s.linearAccelerationBackups = append(s.linearAccelerationBackups, backup)
+			}
+			if props.LinearVelocitySupported {
+				s.linearVelocityBackups = append(s.linearVelocityBackups, backup)
+			}
+			if props.OrientationSupported {
+				s.orientationBackups = append(s.orientationBackups, backup)
+			}
+			if props.CompassHeadingSupported {
+				s.compassHeadingBackups = append(s.compassHeadingBackups, backup)
+			}
 		}
 	}
 
@@ -82,6 +115,21 @@ func newFailoverMovementSensor(ctx context.Context, deps resource.Dependencies, 
 	if conf.Timeout > 0 {
 		s.timeout = conf.Timeout
 	}
+
+	s.positionChan = make(chan bool)
+	s.orientationChan = make(chan bool)
+	s.compassHeadingChan = make(chan bool)
+	s.orientationChan = make(chan bool)
+	s.linearAccChan = make(chan bool)
+	s.linearVelocityChan = make(chan bool)
+	s.angularVelocityChan = make(chan bool)
+
+	PollPrimaryForHealth(s, s.positionChan, PositionWrapper)
+	PollPrimaryForHealth(s, s.orientationChan, OrientationWrapper)
+	PollPrimaryForHealth(s, s.positionChan, PositionWrapper)
+	PollPrimaryForHealth(s, s.positionChan, PositionWrapper)
+	PollPrimaryForHealth(s, s.positionChan, PositionWrapper)
+	PollPrimaryForHealth(s, s.positionChan, PositionWrapper)
 
 	return s, nil
 }
@@ -109,7 +157,11 @@ func (s *failoverMovementSensor) LinearVelocity(ctx context.Context, extra map[s
 	if err != nil {
 		return r3.Vector{}, errors.New("all movement sensors failed to get linear velocity")
 	}
-	return reading["velocity"].(r3.Vector), nil
+	vel, err := common.GetReadingFromMap[r3.Vector](reading, "velocity")
+	if err != nil {
+		return r3.Vector{}, fmt.Errorf("all movement sensors failed to get linear velocity: %w", err)
+	}
+	return vel, nil
 }
 
 func (s *failoverMovementSensor) AngularVelocity(ctx context.Context, extra map[string]interface{}) (spatialmath.AngularVelocity, error) {
@@ -140,15 +192,18 @@ func (s *failoverMovementSensor) Accuracy(ctx context.Context, extra map[string]
 
 func (s *failoverMovementSensor) Properties(ctx context.Context, extra map[string]interface{}) (*movementsensor.Properties, error) {
 	return &movementsensor.Properties{
-		PositionSupported:       true,
-		OrientationSupported:    true,
-		CompassHeadingSupported: true,
-		LinearVelocitySupported: true,
+		PositionSupported:           true,
+		OrientationSupported:        true,
+		CompassHeadingSupported:     true,
+		LinearVelocitySupported:     true,
+		LinearAccelerationSupported: true,
+		AngularVelocitySupported:    true,
 	}, nil
 }
 
 func tryBackups[T any](ctx context.Context,
 	ps *failoverMovementSensor,
+	backups []movementsensor.MovementSensor,
 	call func(ctx context.Context, ps resource.Sensor, extra map[string]interface{}) (T, error),
 	extra map[string]interface{}) (
 	T, error) {
@@ -156,7 +211,7 @@ func tryBackups[T any](ctx context.Context,
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
 	var zero T
-	for _, backup := range ps.backups {
+	for _, backup := range backups {
 		// if the last working sensor is a backup, it was already tried above.
 		if ps.lastWorkingSensor == backup {
 			continue
@@ -172,6 +227,42 @@ func tryBackups[T any](ctx context.Context,
 		}
 	}
 	return zero, fmt.Errorf("all power sensors failed")
+}
+
+// pollPrimaryForHealth starts a background routine that waits for data to come into pollPrimary channel,
+// then continuously polls the primary sensor until it returns a reading, and replaces lastWorkingSensor.
+func PollPrimaryForHealth[K any](s *failoverMovementSensor,
+	startChan chan bool,
+	call func(context.Context, resource.Sensor, map[string]interface{}) (K, error)) {
+	// poll every 10 ms.
+	ticker := time.NewTicker(time.Millisecond * 10)
+	s.workers.AddWorkers(func(ctx context.Context) {
+		for {
+			select {
+			// wait for data to come into the channel before polling.
+			case <-ctx.Done():
+				return
+			case <-startChan:
+			}
+			// label for loop so we can break out of it later.
+		L:
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					_, err := common.TryReadingOrFail(ctx, s.timeout, s.primary, call, nil)
+					if err == nil {
+						s.logger.Infof("successfully got reading from primary sensor")
+						s.mu.Lock()
+						s.lastWorkingSensor = s.primary
+						s.mu.Unlock()
+						break L
+					}
+				}
+			}
+		}
+	})
 }
 
 func (s *failoverMovementSensor) Close(context.Context) error {

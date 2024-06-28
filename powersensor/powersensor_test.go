@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"failover/common"
-	"fmt"
 	"runtime"
 	"testing"
 	"time"
@@ -24,6 +23,15 @@ const (
 )
 
 var errTest = errors.New("error")
+
+var config = resource.Config{
+	Name: "failover",
+	ConvertedAttributes: common.Config{
+		Primary: "primary",
+		Backups: []string{"backup1", "backup2"},
+		Timeout: 1,
+	},
+}
 
 type testPowerSensors struct {
 	primary *inject.PowerSensor
@@ -48,53 +56,36 @@ func setup(t *testing.T) (testPowerSensors, resource.Dependencies) {
 	return powerSensors, deps
 }
 
-func TestNewFailoverSensor(t *testing.T) {
+func TestNewFailoverPowerSensor(t *testing.T) {
 	logger := logging.NewTestLogger(t)
 	ctx := context.Background()
 	_, deps := setup(t)
 
 	tests := []struct {
 		name        string
-		config      resource.Config
 		deps        resource.Dependencies
 		expectedErr error
 	}{
 		{
 			name: "A valid config should successfully create failover power sensor",
-			config: resource.Config{
-				Name: "failover",
-				ConvertedAttributes: common.Config{
-					Primary: "primary",
-					Backups: []string{"backup1", "backup2"},
-					Timeout: 1,
-				},
-			},
 			deps: deps,
 		},
 		{
-			name: "config without dependencies should error",
-			config: resource.Config{
-				Name: "failover",
-				ConvertedAttributes: common.Config{
-					Primary: "primary",
-					Backups: []string{"backup1", "backup2"},
-					Timeout: 1,
-				},
-			},
+			name:        "config without dependencies should error",
 			expectedErr: errors.New("Resource missing from dependencies"),
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			s, err := newFailoverPowerSensor(ctx, tc.deps, tc.config, logger)
+			s, err := newFailoverPowerSensor(ctx, tc.deps, config, logger)
 			if tc.expectedErr != nil {
 				test.That(t, err, test.ShouldNotBeNil)
 				test.That(t, err.Error(), test.ShouldContainSubstring, tc.expectedErr.Error())
 			} else {
 				test.That(t, err, test.ShouldBeNil)
 				test.That(t, s, test.ShouldNotBeNil)
-				test.That(t, s.Name(), test.ShouldResemble, tc.config.ResourceName())
+				test.That(t, s.Name(), test.ShouldResemble, config.ResourceName())
 				fs := s.(*failoverPowerSensor)
 				test.That(t, fs.primary, test.ShouldNotBeNil)
 				test.That(t, len(fs.backups), test.ShouldEqual, 2)
@@ -104,168 +95,363 @@ func TestNewFailoverSensor(t *testing.T) {
 	}
 }
 
-func TestFunctions(t *testing.T) {
+func TestPower(t *testing.T) {
 	logger := logging.NewTestLogger(t)
 	ctx := context.Background()
 	sensors, deps := setup(t)
 
 	var tests = []struct {
-		name   string
-		config resource.Config
+		name string
 
-		primaryReading  map[string]interface{}
-		primaryErr      error
-		backup1Reading  map[string]interface{}
-		backup1Err      error
-		backup2Reading  map[string]interface{}
-		backup2Err      error
-		expectedReading map[string]interface{}
-
-		primaryVoltage  float64
-		backup1Voltage  float64
-		backup2Voltage  float64
-		expectedVoltage float64
-
-		primaryCurrent  float64
-		backup1Current  float64
-		backup2Current  float64
-		expectedCurrent float64
-
-		primaryPower  float64
-		backup1Power  float64
-		backup2Power  float64
-		expectedPower float64
-
-		primaryTimeSeconds int
+		primaryPower       float64
+		backup1Power       float64
+		backup2Power       float64
+		expectedPower      float64
+		primaryErr         error
+		backup1Err         error
+		backup2Err         error
 		expectErr          bool
+		primaryTimeSeconds int
 	}{
 		{
-			name: "if the primary succeeds, should return primary reading",
-			config: resource.Config{
-				Name: "failover",
-				ConvertedAttributes: common.Config{
-					Primary: "primary",
-					Backups: []string{"backup1", "backup2"},
-					Timeout: 1,
-				},
-			},
-			primaryReading:  map[string]interface{}{"primary_reading": 1},
-			backup1Reading:  map[string]interface{}{"a": 1},
-			expectedReading: map[string]interface{}{"primary_reading": 1},
-			primaryVoltage:  2.4,
-			backup1Voltage:  3,
-			backup2Voltage:  4,
-			expectedVoltage: 2.4,
-			primaryCurrent:  1,
-			backup1Current:  3,
-			backup2Current:  4,
-			expectedCurrent: 1,
-			primaryPower:    3,
-			backup1Power:    4,
-			backup2Power:    5,
-			expectedPower:   3,
+			name:          "if the primary succeeds, should return primary reading",
+			primaryPower:  2.4,
+			backup1Power:  3,
+			backup2Power:  4,
+			expectedPower: 2.4,
+			expectErr:     false,
 		},
 		{
-			name: "if the primary fails, backup1 is returned",
-			config: resource.Config{
-				Name: "failover",
-				ConvertedAttributes: common.Config{
-					Primary: "primary",
-					Backups: []string{"backup1", "backup2"},
-					Timeout: 1,
-				},
-			},
-			primaryReading:  nil,
-			primaryErr:      errTest,
-			backup1Reading:  map[string]interface{}{"a": 1},
-			expectedReading: map[string]interface{}{"a": 1},
-			expectErr:       false,
-			primaryVoltage:  2.4,
-			backup1Voltage:  3,
-			backup2Voltage:  4,
-			expectedVoltage: 3,
-			primaryCurrent:  1,
-			backup1Current:  3,
-			backup2Current:  4,
-			expectedCurrent: 3,
-			primaryPower:    3,
-			backup1Power:    4,
-			backup2Power:    5,
-			expectedPower:   4,
+			name:          "if the primary fails, backup1 is returned",
+			primaryPower:  2.4,
+			primaryErr:    errTest,
+			backup1Power:  3,
+			backup2Power:  4,
+			expectedPower: 3,
 		},
 		{
-			name: "if primary and backup1 fail, backup2 is returned",
-			config: resource.Config{
-				Name: "failover",
-				ConvertedAttributes: common.Config{
-					Primary: "primary",
-					Backups: []string{"backup1", "backup2"},
-					Timeout: 1,
-				},
-			},
-			primaryErr:      errTest,
-			backup1Err:      errTest,
-			backup2Reading:  map[string]interface{}{"a": 2},
-			expectedReading: map[string]interface{}{"a": 2},
-			expectErr:       false,
-			primaryVoltage:  2.4,
-			backup1Voltage:  3,
-			backup2Voltage:  4,
-			expectedVoltage: 4,
-			primaryCurrent:  1,
-			backup1Current:  3,
-			backup2Current:  4,
-			expectedCurrent: 4,
-			primaryPower:    3,
-			backup1Power:    4,
-			backup2Power:    5,
-			expectedPower:   5,
+			name:          "if primary and backup1 fail, backup2 is returned",
+			primaryErr:    errTest,
+			backup1Err:    errTest,
+			expectErr:     false,
+			primaryPower:  2.4,
+			backup1Power:  3,
+			backup2Power:  4,
+			expectedPower: 4,
 		},
 		{
-			name: "if all sensors error, return error",
-			config: resource.Config{
-				Name: "failover",
-				ConvertedAttributes: common.Config{
-					Primary: "primary",
-					Backups: []string{"backup1", "backup2"},
-					Timeout: 1,
-				},
-			},
+			name:               "a reading should timeout after default of 1 second",
+			primaryTimeSeconds: 1,
+			primaryPower:       2.4,
+			backup1Power:       3,
+			expectedPower:      3,
+			expectErr:          false,
+		},
+		{
+			name:       "if all sensors error, return error",
 			primaryErr: errTest,
 			backup1Err: errTest,
 			backup2Err: errTest,
 			expectErr:  true,
 		},
+	}
+
+	for _, tc := range tests {
+
+		goRoutinesStart := runtime.NumGoroutine()
+		s, err := newFailoverPowerSensor(ctx, deps, config, logger)
+		test.That(t, err, test.ShouldBeNil)
+
+		sensors.primary.PowerFunc = func(ctx context.Context, extra map[string]interface{}) (float64, error) {
+			time.Sleep(time.Duration(tc.primaryTimeSeconds) * time.Second)
+			return tc.primaryPower, tc.primaryErr
+		}
+
+		sensors.backup1.PowerFunc = func(ctx context.Context, extra map[string]interface{}) (float64, error) {
+			return tc.backup1Power, tc.backup1Err
+		}
+		sensors.backup2.PowerFunc = func(ctx context.Context, extra map[string]interface{}) (float64, error) {
+			return tc.backup2Power, tc.backup2Err
+		}
+
+		watts, err := s.Power(ctx, nil)
+
+		if tc.expectErr {
+			test.That(t, err, test.ShouldNotBeNil)
+			test.That(t, err.Error(), test.ShouldContainSubstring, "all power sensors failed to get power")
+		} else {
+			test.That(t, err, test.ShouldBeNil)
+			test.That(t, watts, test.ShouldEqual, tc.expectedPower)
+		}
+
+		err = s.Close(ctx)
+		test.That(t, err, test.ShouldBeNil)
+		time.Sleep(1 * time.Second)
+		goRoutinesEnd := runtime.NumGoroutine()
+		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
+	}
+
+}
+
+func TestCurrent(t *testing.T) {
+	logger := logging.NewTestLogger(t)
+	ctx := context.Background()
+	sensors, deps := setup(t)
+
+	var tests = []struct {
+		name string
+
+		primaryCurrent     float64
+		backup1Current     float64
+		backup2Current     float64
+		expectedCurrent    float64
+		primaryErr         error
+		backup1Err         error
+		backup2Err         error
+		expectErr          bool
+		primaryTimeSeconds int
+	}{
 		{
-			name: "a reading should timeout after default of 1 second",
-			config: resource.Config{
-				Name: "failover",
-				ConvertedAttributes: common.Config{
-					Primary: "primary",
-					Backups: []string{"backup1", "backup2"},
-					Timeout: 1,
-				},
-			},
+			name:            "if the primary succeeds, should return primary reading",
+			primaryCurrent:  2.4,
+			backup1Current:  3,
+			backup2Current:  4,
+			expectedCurrent: 2.4,
+			expectErr:       false,
+		},
+		{
+			name:            "if the primary fails, backup1 is returned",
+			primaryCurrent:  2.4,
+			primaryErr:      errTest,
+			backup1Current:  3,
+			backup2Current:  4,
+			expectedCurrent: 3,
+		},
+		{
+			name:            "if primary and backup1 fail, backup2 is returned",
+			primaryErr:      errTest,
+			backup1Err:      errTest,
+			expectErr:       false,
+			primaryCurrent:  2.4,
+			backup1Current:  3,
+			backup2Current:  4,
+			expectedCurrent: 4,
+		},
+		{
+			name:               "a reading should timeout after default of 1 second",
 			primaryTimeSeconds: 1,
-			primaryReading:     map[string]interface{}{"a": 1},
-			backup1Reading:     map[string]interface{}{"a": 2},
-			expectedReading:    map[string]interface{}{"a": 2},
-			primaryVoltage:     2.4,
-			backup1Voltage:     3,
-			expectedVoltage:    3,
-			primaryCurrent:     1,
+			primaryCurrent:     2.4,
 			backup1Current:     3,
 			expectedCurrent:    3,
-			primaryPower:       3,
-			backup1Power:       4,
-			expectedPower:      4,
 			expectErr:          false,
+		},
+		{
+			name:       "if all sensors error, return error",
+			primaryErr: errTest,
+			backup1Err: errTest,
+			backup2Err: errTest,
+			expectErr:  true,
 		},
 	}
 
 	for _, tc := range tests {
+
 		goRoutinesStart := runtime.NumGoroutine()
-		s, err := newFailoverPowerSensor(ctx, deps, tc.config, logger)
+		s, err := newFailoverPowerSensor(ctx, deps, config, logger)
+		test.That(t, err, test.ShouldBeNil)
+
+		sensors.primary.CurrentFunc = func(ctx context.Context, extra map[string]interface{}) (float64, bool, error) {
+			time.Sleep(time.Duration(tc.primaryTimeSeconds) * time.Second)
+			return tc.primaryCurrent, false, tc.primaryErr
+		}
+
+		sensors.backup1.CurrentFunc = func(ctx context.Context, extra map[string]interface{}) (float64, bool, error) {
+			return tc.backup1Current, false, tc.backup1Err
+		}
+		sensors.backup2.CurrentFunc = func(ctx context.Context, extra map[string]interface{}) (float64, bool, error) {
+			return tc.backup2Current, false, tc.backup2Err
+		}
+
+		amps, ac, err := s.Current(ctx, nil)
+
+		if tc.expectErr {
+			test.That(t, err, test.ShouldNotBeNil)
+			test.That(t, err.Error(), test.ShouldContainSubstring, "all power sensors failed to get current")
+		} else {
+			test.That(t, err, test.ShouldBeNil)
+			test.That(t, amps, test.ShouldEqual, tc.expectedCurrent)
+			test.That(t, ac, test.ShouldEqual, false)
+		}
+
+		err = s.Close(ctx)
+		test.That(t, err, test.ShouldBeNil)
+		time.Sleep(1 * time.Second)
+		goRoutinesEnd := runtime.NumGoroutine()
+		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
+	}
+
+}
+
+func TestVoltage(t *testing.T) {
+	logger := logging.NewTestLogger(t)
+	ctx := context.Background()
+	sensors, deps := setup(t)
+
+	var tests = []struct {
+		name string
+
+		primaryVoltage     float64
+		backup1Voltage     float64
+		backup2Voltage     float64
+		expectedVoltage    float64
+		primaryErr         error
+		backup1Err         error
+		backup2Err         error
+		expectErr          bool
+		primaryTimeSeconds int
+	}{
+		{
+			name:            "if the primary succeeds, should return primary reading",
+			primaryVoltage:  2.4,
+			backup1Voltage:  3,
+			backup2Voltage:  4,
+			expectedVoltage: 2.4,
+			expectErr:       false,
+		},
+		{
+			name:            "if the primary fails, backup1 is returned",
+			primaryVoltage:  2.4,
+			primaryErr:      errTest,
+			backup1Voltage:  3,
+			backup2Voltage:  4,
+			expectedVoltage: 3,
+		},
+		{
+			name:            "if primary and backup1 fail, backup2 is returned",
+			primaryErr:      errTest,
+			backup1Err:      errTest,
+			expectErr:       false,
+			primaryVoltage:  2.4,
+			backup1Voltage:  3,
+			backup2Voltage:  4,
+			expectedVoltage: 4,
+		},
+		{
+			name:               "a reading should timeout after default of 1 second",
+			primaryTimeSeconds: 1,
+			primaryVoltage:     2.4,
+			backup1Voltage:     3,
+			expectedVoltage:    3,
+			expectErr:          false,
+		},
+		{
+			name:       "if all sensors error, return error",
+			primaryErr: errTest,
+			backup1Err: errTest,
+			backup2Err: errTest,
+			expectErr:  true,
+		},
+	}
+
+	for _, tc := range tests {
+
+		goRoutinesStart := runtime.NumGoroutine()
+		s, err := newFailoverPowerSensor(ctx, deps, config, logger)
+		test.That(t, err, test.ShouldBeNil)
+
+		sensors.primary.VoltageFunc = func(ctx context.Context, extra map[string]interface{}) (float64, bool, error) {
+			time.Sleep(time.Duration(tc.primaryTimeSeconds) * time.Second)
+			return tc.primaryVoltage, false, tc.primaryErr
+		}
+
+		sensors.backup1.VoltageFunc = func(ctx context.Context, extra map[string]interface{}) (float64, bool, error) {
+			return tc.backup1Voltage, false, tc.backup1Err
+		}
+		sensors.backup2.VoltageFunc = func(ctx context.Context, extra map[string]interface{}) (float64, bool, error) {
+			return tc.backup2Voltage, false, tc.backup2Err
+		}
+
+		volts, ac, err := s.Voltage(ctx, nil)
+
+		if tc.expectErr {
+			test.That(t, err, test.ShouldNotBeNil)
+			test.That(t, err.Error(), test.ShouldContainSubstring, "all power sensors failed to get voltage")
+		} else {
+			test.That(t, err, test.ShouldBeNil)
+			test.That(t, volts, test.ShouldEqual, tc.expectedVoltage)
+			test.That(t, ac, test.ShouldEqual, false)
+		}
+
+		err = s.Close(ctx)
+		test.That(t, err, test.ShouldBeNil)
+		time.Sleep(1 * time.Second)
+		goRoutinesEnd := runtime.NumGoroutine()
+		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
+	}
+
+}
+
+func TestReadings(t *testing.T) {
+	logger := logging.NewTestLogger(t)
+	ctx := context.Background()
+	sensors, deps := setup(t)
+
+	var tests = []struct {
+		name string
+
+		primaryReading     map[string]interface{}
+		primaryErr         error
+		backup1Reading     map[string]interface{}
+		backup1Err         error
+		backup2Reading     map[string]interface{}
+		backup2Err         error
+		expectedReading    map[string]interface{}
+		primaryTimeSeconds int
+		expectErr          bool
+	}{
+		{
+			name:            "if the primary succeeds, should return primary reading",
+			primaryReading:  map[string]interface{}{"primary_reading": 1},
+			backup1Reading:  map[string]interface{}{"a": 1},
+			expectedReading: map[string]interface{}{"primary_reading": 1},
+		},
+		{
+			name:            "if the primary fails, backup1 is returned",
+			primaryReading:  nil,
+			primaryErr:      errTest,
+			backup1Reading:  map[string]interface{}{"a": 1},
+			expectedReading: map[string]interface{}{"a": 1},
+			expectErr:       false,
+		},
+		{
+			name:            "if primary and backup1 fail, backup2 is returned",
+			primaryErr:      errTest,
+			backup1Err:      errTest,
+			backup2Reading:  map[string]interface{}{"a": 2},
+			expectedReading: map[string]interface{}{"a": 2},
+			expectErr:       false,
+		},
+		{
+			name:               "a reading should timeout after default of 1 second",
+			primaryTimeSeconds: 1,
+			primaryReading:     map[string]interface{}{"a": 1},
+			backup1Reading:     map[string]interface{}{"a": 2},
+			expectedReading:    map[string]interface{}{"a": 2},
+			expectErr:          false,
+		},
+		{
+			name:       "if all sensors error, return error",
+			primaryErr: errTest,
+			backup1Err: errTest,
+			backup2Err: errTest,
+			expectErr:  true,
+		},
+	}
+
+	for _, tc := range tests {
+
+		goRoutinesStart := runtime.NumGoroutine()
+		s, err := newFailoverPowerSensor(ctx, deps, config, logger)
 		test.That(t, err, test.ShouldBeNil)
 
 		sensors.primary.ReadingsFunc = func(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
@@ -280,41 +466,6 @@ func TestFunctions(t *testing.T) {
 			return tc.backup2Reading, tc.backup2Err
 		}
 
-		sensors.primary.VoltageFunc = func(ctx context.Context, extra map[string]interface{}) (float64, bool, error) {
-			time.Sleep(time.Duration(tc.primaryTimeSeconds) * time.Second)
-			return tc.primaryVoltage, false, tc.primaryErr
-		}
-
-		sensors.backup1.VoltageFunc = func(ctx context.Context, extra map[string]interface{}) (float64, bool, error) {
-			return tc.backup1Voltage, false, tc.backup1Err
-		}
-		sensors.backup2.VoltageFunc = func(ctx context.Context, extra map[string]interface{}) (float64, bool, error) {
-			return tc.backup2Voltage, false, tc.backup2Err
-		}
-
-		sensors.primary.CurrentFunc = func(ctx context.Context, extra map[string]interface{}) (float64, bool, error) {
-			time.Sleep(time.Duration(tc.primaryTimeSeconds) * time.Second)
-			return tc.primaryCurrent, false, tc.primaryErr
-		}
-
-		sensors.backup1.CurrentFunc = func(ctx context.Context, extra map[string]interface{}) (float64, bool, error) {
-			return tc.backup1Current, false, tc.backup1Err
-		}
-		sensors.backup2.CurrentFunc = func(ctx context.Context, extra map[string]interface{}) (float64, bool, error) {
-			return tc.backup2Current, false, tc.backup2Err
-		}
-		sensors.primary.PowerFunc = func(ctx context.Context, extra map[string]interface{}) (float64, error) {
-			time.Sleep(time.Duration(tc.primaryTimeSeconds) * time.Second)
-			return tc.primaryPower, tc.primaryErr
-		}
-
-		sensors.backup1.PowerFunc = func(ctx context.Context, extra map[string]interface{}) (float64, error) {
-			return tc.backup1Power, tc.backup1Err
-		}
-		sensors.backup2.PowerFunc = func(ctx context.Context, extra map[string]interface{}) (float64, error) {
-			return tc.backup2Power, tc.backup2Err
-		}
-
 		reading, err := s.Readings(ctx, nil)
 
 		if tc.expectErr {
@@ -323,30 +474,6 @@ func TestFunctions(t *testing.T) {
 		} else {
 			test.That(t, err, test.ShouldBeNil)
 			test.That(t, reading, test.ShouldResemble, tc.expectedReading)
-		}
-
-		volts, ac, err := s.Voltage(ctx, nil)
-		fmt.Println(err)
-
-		if tc.expectErr {
-			test.That(t, err, test.ShouldNotBeNil)
-			test.That(t, err.Error(), test.ShouldContainSubstring, "all power sensors failed to get voltage")
-		} else {
-			test.That(t, err, test.ShouldBeNil)
-			test.That(t, volts, test.ShouldEqual, tc.expectedVoltage)
-			test.That(t, ac, test.ShouldEqual, false)
-		}
-
-		amps, ac, err := s.Current(ctx, nil)
-		fmt.Println(err)
-
-		if tc.expectErr {
-			test.That(t, err, test.ShouldNotBeNil)
-			test.That(t, err.Error(), test.ShouldContainSubstring, "all power sensors failed to get current")
-		} else {
-			test.That(t, err, test.ShouldBeNil)
-			test.That(t, amps, test.ShouldEqual, tc.expectedCurrent)
-			test.That(t, ac, test.ShouldEqual, false)
 		}
 
 		err = s.Close(ctx)
