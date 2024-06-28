@@ -29,7 +29,6 @@ func VoltageWrapper(ctx context.Context, ps resource.Sensor, extra map[string]in
 }
 
 func CurrentWrapper(ctx context.Context, ps resource.Sensor, extra map[string]interface{}) (map[string]interface{}, error) {
-
 	powersensor, ok := ps.(powersensor.PowerSensor)
 	if !ok {
 		return nil, errors.New("type assertion to power sensor failed")
@@ -47,7 +46,6 @@ func CurrentWrapper(ctx context.Context, ps resource.Sensor, extra map[string]in
 }
 
 func PowerWrapper(ctx context.Context, ps resource.Sensor, extra map[string]interface{}) (map[string]interface{}, error) {
-
 	powersensor, ok := ps.(powersensor.PowerSensor)
 	if !ok {
 		return nil, errors.New("type assertion to power sensor failed")
