@@ -22,7 +22,7 @@ var Model = resource.NewModel("viam", "failover", "movementsensor")
 
 func init() {
 	resource.RegisterComponent(movementsensor.API, Model,
-		resource.Registration[movementsensor.MovementSensor, *Config]{
+		resource.Registration[movementsensor.MovementSensor, *common.Config]{
 			Constructor: newFailoverMovementSensor,
 		},
 	)
@@ -94,7 +94,10 @@ func (s *failoverMovementSensor) LinearVelocity(ctx context.Context, extra map[s
 	// Poll the last sensor we know is working
 	reading, err := common.TryReadingOrFail(ctx, s.timeout, s.lastWorkingSensor, LinearVelocityWrapper, extra)
 	if err == nil {
-		return reading["velocity"].(r3.Vector), nil
+		vel, err := common.GetReadingFromMap[r3.Vector](reading, "velocity")
+		if err == nil {
+			return vel, nil
+		}
 	}
 	// upon error of the last working sensor, log returned error.
 	s.logger.Warnf(err.Error())
