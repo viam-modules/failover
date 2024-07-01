@@ -44,7 +44,7 @@ type ReadingsResult struct {
 }
 
 // getReading calls the inputted API call and returns the reading and error as a ReadingsResult struct.
-func getReading[K any](ctx context.Context, call func(context.Context, resource.Sensor, map[string]interface{}) (K, error), sensor resource.Sensor, extra map[string]interface{}) ReadingsResult {
+func getReading[K any](ctx context.Context, call func(context.Context, resource.Sensor, map[string]any) (K, error), sensor resource.Sensor, extra map[string]any) ReadingsResult {
 	reading, err := call(ctx, sensor, extra)
 
 	return ReadingsResult{
@@ -57,8 +57,8 @@ func getReading[K any](ctx context.Context, call func(context.Context, resource.
 func TryReadingOrFail[K any](ctx context.Context,
 	timeout int,
 	s resource.Sensor,
-	call func(context.Context, resource.Sensor, map[string]interface{}) (K, error),
-	extra map[string]interface{}) (
+	call func(context.Context, resource.Sensor, map[string]any) (K, error),
+	extra map[string]any) (
 	K, error) {
 
 	resultChan := make(chan ReadingsResult, 1)
@@ -79,42 +79,10 @@ func TryReadingOrFail[K any](ctx context.Context,
 }
 
 // Since all sensors implement readings we can reuse the same wrapper for all models.
-func ReadingsWrapper(ctx context.Context, s resource.Sensor, extra map[string]interface{}) (any, error) {
+func ReadingsWrapper(ctx context.Context, s resource.Sensor, extra map[string]any) (any, error) {
 	readings, err := s.Readings(ctx, extra)
 	if err != nil {
 		return nil, err
 	}
 	return readings, err
-}
-
-// Helper function to get the reading from the map and convert is type.
-func GetReadingFromMap[T any](m map[string]interface{}, reading string) (T, error) {
-	var zero T
-	r, ok := m[reading]
-	if !ok {
-		return zero, errors.New("failed to get reading from map")
-	}
-	ret, ok := any(r).(T)
-	if !ok {
-		return zero, errors.New("reading failed type assertion")
-	}
-
-	return ret, nil
-}
-
-func Get2ReadingsFromMap[T any, R any](m map[string]interface{}, reading1 string, reading2 string) (T, R, error) {
-	var zeroT T
-	var zeroR R
-
-	ret1, err := GetReadingFromMap[T](m, reading1)
-	if err != nil {
-		return zeroT, zeroR, err
-	}
-
-	ret2, err := GetReadingFromMap[R](m, reading2)
-	if err != nil {
-		return zeroT, zeroR, err
-	}
-
-	return ret1, ret2, nil
 }

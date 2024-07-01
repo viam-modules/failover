@@ -8,7 +8,7 @@ import (
 	"go.viam.com/rdk/resource"
 )
 
-// Wrapping all of powersensor APIs to return a map[string]interface{} containing their return values.
+// Wrapping all of powersensor APIs to return one struct containing their return values.
 // These wrappers can used as parameters in the generic helper functions.
 
 type voltageVals struct {
