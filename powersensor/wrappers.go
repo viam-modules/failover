@@ -9,26 +9,42 @@ import (
 )
 
 // Wrapping all of powersensor APIs to return a map[string]interface{} containing their return values.
-// This way, these wrappers can used as parameters in the generic helper functions.
+// These wrappers can used as parameters in the generic helper functions.
 
-func voltageWrapper(ctx context.Context, ps resource.Sensor, extra map[string]interface{}) (map[string]interface{}, error) {
+type voltageVals struct {
+	volts float64
+	isAc  bool
+}
+
+func voltageWrapper(ctx context.Context, ps resource.Sensor, extra map[string]any) (any, error) {
+
+	ret := voltageVals{}
+
 	powersensor, ok := ps.(powersensor.PowerSensor)
 	if !ok {
-		return nil, errors.New("type assertion to power sensor failed")
+		return ret, errors.New("type assertion to power sensor failed")
 	}
 
 	volts, isAc, err := powersensor.Voltage(ctx, extra)
 
 	if err != nil {
-		return nil, err
+		return ret, err
 	}
-	m := make(map[string]interface{})
-	m["volts"] = volts
-	m["isAC"] = isAc
-	return m, nil
+
+	ret.volts = volts
+	ret.isAc = isAc
+
+	return ret, nil
 }
 
-func currentWrapper(ctx context.Context, ps resource.Sensor, extra map[string]interface{}) (map[string]interface{}, error) {
+type currentVals struct {
+	amps float64
+	isAc bool
+}
+
+func currentWrapper(ctx context.Context, ps resource.Sensor, extra map[string]any) (any, error) {
+	ret := currentVals{}
+
 	powersensor, ok := ps.(powersensor.PowerSensor)
 	if !ok {
 		return nil, errors.New("type assertion to power sensor failed")
@@ -38,14 +54,14 @@ func currentWrapper(ctx context.Context, ps resource.Sensor, extra map[string]in
 	if err != nil {
 		return nil, err
 	}
-	m := make(map[string]interface{})
-	m["amps"] = amps
-	m["isAC"] = isAc
 
-	return m, nil
+	ret.amps = amps
+	ret.isAc = isAc
+
+	return ret, nil
 }
 
-func powerWrapper(ctx context.Context, ps resource.Sensor, extra map[string]interface{}) (map[string]interface{}, error) {
+func powerWrapper(ctx context.Context, ps resource.Sensor, extra map[string]any) (any, error) {
 	powersensor, ok := ps.(powersensor.PowerSensor)
 	if !ok {
 		return nil, errors.New("type assertion to power sensor failed")
@@ -54,9 +70,5 @@ func powerWrapper(ctx context.Context, ps resource.Sensor, extra map[string]inte
 	if err != nil {
 		return nil, err
 	}
-
-	m := make(map[string]interface{})
-	m["watts"] = watts
-
-	return m, nil
+	return watts, nil
 }
