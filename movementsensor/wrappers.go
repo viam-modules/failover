@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 
+	"github.com/golang/geo/r3"
 	geo "github.com/kellydunn/golang-geo"
 	"go.viam.com/rdk/components/movementsensor"
 	"go.viam.com/rdk/resource"
+	"go.viam.com/rdk/spatialmath"
 )
 
 type postionVals struct {
@@ -14,17 +16,17 @@ type postionVals struct {
 	altitiude float64
 }
 
-func positionWrapper(ctx context.Context, s resource.Sensor, extra map[string]any) (any, error) {
+func positionWrapper(ctx context.Context, s resource.Sensor, extra map[string]any) (postionVals, error) {
 	vals := postionVals{}
 
 	ms, ok := s.(movementsensor.MovementSensor)
 	if !ok {
-		return nil, errors.New("type assertion to movement sensor failed")
+		return vals, errors.New("type assertion to movement sensor failed")
 	}
 
 	pos, alt, err := ms.Position(ctx, extra)
 	if err != nil {
-		return nil, err
+		return vals, err
 	}
 
 	vals.position = pos
@@ -34,91 +36,82 @@ func positionWrapper(ctx context.Context, s resource.Sensor, extra map[string]an
 
 }
 
-func linearVelocityWrapper(ctx context.Context, s resource.Sensor, extra map[string]any) (any, error) {
+func linearVelocityWrapper(ctx context.Context, s resource.Sensor, extra map[string]any) (r3.Vector, error) {
 	ms, ok := s.(movementsensor.MovementSensor)
 	if !ok {
-		return nil, errors.New("type assertion to movement sensor failed")
+		return r3.Vector{}, errors.New("type assertion to movement sensor failed")
 	}
 
 	vel, err := ms.LinearVelocity(ctx, extra)
 	if err != nil {
-		return nil, err
+		return r3.Vector{}, err
 	}
-
 	return vel, nil
 
 }
 
-func angularVelocityWrapper(ctx context.Context, s resource.Sensor, extra map[string]interface{}) (any, error) {
+func angularVelocityWrapper(ctx context.Context, s resource.Sensor, extra map[string]any) (spatialmath.AngularVelocity, error) {
 	ms, ok := s.(movementsensor.MovementSensor)
 	if !ok {
-		return nil, errors.New("type assertion to movement sensor failed")
+		return spatialmath.AngularVelocity{}, errors.New("type assertion to movement sensor failed")
 	}
 
 	vel, err := ms.AngularVelocity(ctx, extra)
 	if err != nil {
-		return nil, err
+		return spatialmath.AngularVelocity{}, err
 	}
-
 	return vel, nil
 }
 
-func linearAccelerationWrapper(ctx context.Context, s resource.Sensor, extra map[string]interface{}) (any, error) {
+func linearAccelerationWrapper(ctx context.Context, s resource.Sensor, extra map[string]any) (r3.Vector, error) {
 	ms, ok := s.(movementsensor.MovementSensor)
 	if !ok {
-		return nil, errors.New("type assertion to movement sensor failed")
+		return r3.Vector{}, errors.New("type assertion to movement sensor failed")
 	}
 
 	acc, err := ms.LinearAcceleration(ctx, extra)
 	if err != nil {
-		return nil, err
+		return r3.Vector{}, err
 	}
 	return acc, nil
 }
 
-func compassHeadingWrapper(ctx context.Context, s resource.Sensor, extra map[string]interface{}) (any, error) {
+func compassHeadingWrapper(ctx context.Context, s resource.Sensor, extra map[string]any) (float64, error) {
 	ms, ok := s.(movementsensor.MovementSensor)
 	if !ok {
-		return nil, errors.New("type assertion to movement sensor failed")
+		return 0, errors.New("type assertion to movement sensor failed")
 	}
 
 	heading, err := ms.CompassHeading(ctx, extra)
-
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 	return heading, nil
 }
 
-func orientationWrapper(ctx context.Context, s resource.Sensor, extra map[string]interface{}) (map[string]interface{}, error) {
+func orientationWrapper(ctx context.Context, s resource.Sensor, extra map[string]any) (spatialmath.Orientation, error) {
 	ms, ok := s.(movementsensor.MovementSensor)
 	if !ok {
 		return nil, errors.New("type assertion to movement sensor failed")
 	}
 
 	orientation, err := ms.Orientation(ctx, extra)
-
 	if err != nil {
 		return nil, err
 	}
-	m := make(map[string]interface{})
-	m["orientation"] = orientation
-	return m, nil
+	return orientation, nil
 }
 
-func accuracyWrapper(ctx context.Context, s resource.Sensor, extra map[string]interface{}) (map[string]interface{}, error,
+func accuracyWrapper(ctx context.Context, s resource.Sensor, extra map[string]interface{}) (*movementsensor.Accuracy, error,
 ) {
 	ms, ok := s.(movementsensor.MovementSensor)
 	if !ok {
-		return nil, errors.New("type assertion to movement sensor failed")
+		return &movementsensor.Accuracy{}, errors.New("type assertion to movement sensor failed")
 	}
 
 	accuracy, err := ms.Accuracy(ctx, extra)
-
 	if err != nil {
-		return nil, err
+		return &movementsensor.Accuracy{}, err
 	}
-	m := make(map[string]interface{})
-	m["accuracy"] = accuracy
-	return m, nil
+	return accuracy, nil
 }
