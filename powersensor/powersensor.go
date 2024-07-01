@@ -26,6 +26,11 @@ func init() {
 	)
 }
 
+type returnVals struct {
+	returnVal1 any
+	returnVal2 any
+}
+
 type failoverPowerSensor struct {
 	resource.AlwaysRebuild
 	resource.Named
@@ -102,12 +107,13 @@ func (ps *failoverPowerSensor) Voltage(ctx context.Context, extra map[string]int
 	defer ps.mu.Unlock()
 	// Poll the last sensor we know is working
 	readings, err := common.TryReadingOrFail(ctx, ps.timeout, ps.lastWorkingSensor, voltageWrapper, extra)
+
 	if err == nil {
-		volts, isAC, newErr := common.Get2ReadingsFromMap[float64, bool](readings, "volts", "isAC")
-		if newErr == nil {
-			return volts, isAC, nil
+		voltageVals, ok := readings.(voltageVals)
+		if !ok {
+			return 0, false, errors.New("voltage reading failed type assertion")
 		}
-		err = newErr
+		return voltageVals.volts, voltageVals.isAc, nil
 	}
 
 	// upon error of the last working sensor, log the error.
@@ -125,12 +131,11 @@ func (ps *failoverPowerSensor) Voltage(ctx context.Context, extra map[string]int
 		return 0, false, errors.New("all power sensors failed to get voltage")
 	}
 
-	volts, isAC, err := common.Get2ReadingsFromMap[float64, bool](readings, "volts", "isAC")
-	if err != nil {
-		return 0, false, fmt.Errorf("all power sensors failed to get voltage: %w", err)
+	voltageVals, ok := readings.(voltageVals)
+	if !ok {
+		return 0, false, errors.New("voltage reading failed type assertion")
 	}
-
-	return volts, isAC, nil
+	return voltageVals.volts, voltageVals.isAc, nil
 
 }
 
@@ -141,13 +146,13 @@ func (ps *failoverPowerSensor) Current(ctx context.Context, extra map[string]int
 	// Poll the last sensor we know is working
 	readings, err := common.TryReadingOrFail(ctx, ps.timeout, ps.lastWorkingSensor, currentWrapper, extra)
 	if err == nil {
-		current, isAC, newErr := common.Get2ReadingsFromMap[float64, bool](readings, "amps", "isAC")
-		if newErr == nil {
-			return current, isAC, nil
+		currentVals, ok := readings.(currentVals)
+		if !ok {
+			return 0, false, errors.New("current reading failed type assertion")
 		}
-		err = newErr
-
+		return currentVals.amps, currentVals.isAc, nil
 	}
+
 	// upon error of the last working sensor, log the error.
 	ps.logger.Warnf("powersensor %s failed to get current: %s", ps.lastWorkingSensor.Name().ShortName(), err.Error())
 
@@ -162,12 +167,11 @@ func (ps *failoverPowerSensor) Current(ctx context.Context, extra map[string]int
 	if err != nil {
 		return 0, false, errors.New("all power sensors failed to get current")
 	}
-
-	amps, isAC, err := common.Get2ReadingsFromMap[float64, bool](readings, "amps", "isAC")
-	if err != nil {
-		return 0, false, fmt.Errorf("all power sensors failed to get current: %w", err)
+	currentVals, ok := readings.(currentVals)
+	if !ok {
+		return 0, false, errors.New("current reading failed type assertion")
 	}
-	return amps, isAC, nil
+	return currentVals.amps, currentVals.isAc, nil
 }
 
 // Power returns the power reading in watts.
@@ -178,11 +182,11 @@ func (ps *failoverPowerSensor) Power(ctx context.Context, extra map[string]inter
 	// Poll the last sensor we know is working
 	readings, err := common.TryReadingOrFail(ctx, ps.timeout, ps.lastWorkingSensor, powerWrapper, extra)
 	if err == nil {
-		watts, newErr := common.GetReadingFromMap[float64](readings, "watts")
-		if newErr == nil {
-			return watts, nil
+		watts, ok := readings.(float64)
+		if !ok {
+			return 0, errors.New("power reading failed type assertion")
 		}
-		err = newErr
+		return watts, nil
 	}
 	// upon error of the last working sensor, log the error.
 	ps.logger.Warnf("powersensor %s failed to get power: %s", ps.lastWorkingSensor.Name().ShortName(), err.Error())
@@ -198,20 +202,25 @@ func (ps *failoverPowerSensor) Power(ctx context.Context, extra map[string]inter
 	if err != nil {
 		return 0, errors.New("all power sensors failed to get power")
 	}
-	watts, err := common.GetReadingFromMap[float64](readings, "watts")
-	if err != nil {
-		return 0, fmt.Errorf("all power sensors failed to get power: %w", err.Error())
+	watts, ok := readings.(float64)
+	if !ok {
+		return 0, errors.New("power reading failed type assertion")
 	}
 	return watts, nil
 }
 
-func (ps *failoverPowerSensor) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
+func (ps *failoverPowerSensor) Readings(ctx context.Context, extra map[string]any) (map[string]any, error) {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
 
 	// Poll the last sensor we know is working
 	readings, err := common.TryReadingOrFail(ctx, ps.timeout, ps.lastWorkingSensor, common.ReadingsWrapper, extra)
+
 	if err == nil {
+		readings, ok := readings.(map[string]interface{})
+		if !ok {
+			return nil, errors.New("failed")
+		}
 		return readings, nil
 	}
 
@@ -229,7 +238,11 @@ func (ps *failoverPowerSensor) Readings(ctx context.Context, extra map[string]in
 	if err != nil {
 		return nil, errors.New("all power sensors failed to get readings")
 	}
-	return readings, nil
+	readingsMap, ok := readings.(map[string]interface{})
+	if !ok {
+		return nil, errors.New("failed")
+	}
+	return readingsMap, nil
 
 }
 

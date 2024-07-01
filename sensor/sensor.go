@@ -3,6 +3,7 @@ package failoversensor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -93,6 +94,10 @@ func (s *failoverSensor) Readings(ctx context.Context, extra map[string]interfac
 	// Poll the last sensor we know is working
 	readings, err := common.TryReadingOrFail(ctx, s.timeout, s.lastWorkingSensor, common.ReadingsWrapper, extra)
 	if readings != nil {
+		readings, ok := readings.(map[string]interface{})
+		if !ok {
+			return nil, errors.New("readings failed type assertion")
+		}
 		return readings, nil
 	}
 	// upon error of the last working sensor, log the error.
@@ -109,10 +114,14 @@ func (s *failoverSensor) Readings(ctx context.Context, extra map[string]interfac
 	if err != nil {
 		return nil, err
 	}
-	return readings, nil
+	readingsMap, ok := readings.(map[string]interface{})
+	if !ok {
+		return nil, errors.New("readings failed type assertion")
+	}
+	return readingsMap, nil
 }
 
-func (s *failoverSensor) tryBackups(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
+func (s *failoverSensor) tryBackups(ctx context.Context, extra map[string]interface{}) (any, error) {
 	// Lock the mutex to protect lastWorkingSensor from changing before this call finishes.
 	s.mu.Lock()
 	defer s.mu.Unlock()

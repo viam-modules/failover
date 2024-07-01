@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"go.viam.com/rdk/components/sensor"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/utils"
 )
@@ -80,12 +79,8 @@ func TryReadingOrFail[K any](ctx context.Context,
 }
 
 // Since all sensors implement readings we can reuse the same wrapper for all models.
-func ReadingsWrapper(ctx context.Context, ps resource.Sensor, extra map[string]interface{}) (map[string]interface{}, error) {
-	sensor, ok := ps.(sensor.Sensor)
-	if !ok {
-		return nil, errors.New("type assetion to sensor failed")
-	}
-	readings, err := sensor.Readings(ctx, extra)
+func ReadingsWrapper(ctx context.Context, s resource.Sensor, extra map[string]interface{}) (any, error) {
+	readings, err := s.Readings(ctx, extra)
 	if err != nil {
 		return nil, err
 	}
