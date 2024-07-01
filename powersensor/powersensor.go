@@ -200,9 +200,7 @@ func (ps *failoverPowerSensor) Power(ctx context.Context, extra map[string]inter
 	}
 	watts, err := common.GetReadingFromMap[float64](readings, "watts")
 	if err != nil {
-		if err != nil {
-			return 0, errors.New("all power sensors failed to get power")
-		}
+		return 0, fmt.Errorf("all power sensors failed to get power: %w", err.Error())
 	}
 	return watts, nil
 }
