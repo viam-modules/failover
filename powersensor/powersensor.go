@@ -219,7 +219,7 @@ func (ps *failoverPowerSensor) Readings(ctx context.Context, extra map[string]an
 	if err == nil {
 		readings, ok := readings.(map[string]interface{})
 		if !ok {
-			return nil, errors.New("failed")
+			return nil, errors.New("readings failed type assertion")
 		}
 		return readings, nil
 	}
@@ -240,7 +240,7 @@ func (ps *failoverPowerSensor) Readings(ctx context.Context, extra map[string]an
 	}
 	readingsMap, ok := readings.(map[string]interface{})
 	if !ok {
-		return nil, errors.New("failed")
+		return nil, errors.New("readings failed type assertion")
 	}
 	return readingsMap, nil
 
