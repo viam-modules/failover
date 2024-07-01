@@ -8,7 +8,7 @@ import (
 	"go.viam.com/rdk/resource"
 )
 
-func PositionWrapper(ctx context.Context, s resource.Sensor, extra map[string]interface{}) (map[string]interface{}, error) {
+func positionWrapper(ctx context.Context, s resource.Sensor, extra map[string]interface{}) (map[string]interface{}, error) {
 	ms, ok := s.(movementsensor.MovementSensor)
 	if !ok {
 		return nil, errors.New("type assertion to movement sensor failed")
@@ -25,7 +25,7 @@ func PositionWrapper(ctx context.Context, s resource.Sensor, extra map[string]in
 	return m, nil
 }
 
-func LinearVelocityWrapper(ctx context.Context, s resource.Sensor, extra map[string]interface{}) (map[string]interface{}, error) {
+func linearVelocityWrapper(ctx context.Context, s resource.Sensor, extra map[string]interface{}) (map[string]interface{}, error) {
 	ms, ok := s.(movementsensor.MovementSensor)
 	if !ok {
 		return nil, errors.New("type assertion to movement sensor failed")
@@ -42,7 +42,7 @@ func LinearVelocityWrapper(ctx context.Context, s resource.Sensor, extra map[str
 
 }
 
-func AngularVelocityWrapper(ctx context.Context, s resource.Sensor, extra map[string]interface{}) (map[string]interface{}, error) {
+func angularVelocityWrapper(ctx context.Context, s resource.Sensor, extra map[string]interface{}) (map[string]interface{}, error) {
 	ms, ok := s.(movementsensor.MovementSensor)
 	if !ok {
 		return nil, errors.New("type assertion to movement sensor failed")
@@ -58,7 +58,7 @@ func AngularVelocityWrapper(ctx context.Context, s resource.Sensor, extra map[st
 	return m, nil
 }
 
-func LinearAcceleration(ctx context.Context, s resource.Sensor, extra map[string]interface{}) (map[string]interface{}, error) {
+func linearAccelerationWrapper(ctx context.Context, s resource.Sensor, extra map[string]interface{}) (map[string]interface{}, error) {
 	ms, ok := s.(movementsensor.MovementSensor)
 	if !ok {
 		return nil, errors.New("type assertion to movement sensor failed")
@@ -74,13 +74,13 @@ func LinearAcceleration(ctx context.Context, s resource.Sensor, extra map[string
 	return m, nil
 }
 
-func CompassHeading(ctx context.Context, s resource.Sensor, extra map[string]interface{}) (map[string]interface{}, error) {
+func compassHeadingWrapper(ctx context.Context, s resource.Sensor, extra map[string]interface{}) (map[string]interface{}, error) {
 	ms, ok := s.(movementsensor.MovementSensor)
 	if !ok {
 		return nil, errors.New("type assertion to movement sensor failed")
 	}
 
-	heading, err := ms.LinearAcceleration(ctx, extra)
+	heading, err := ms.CompassHeading(ctx, extra)
 
 	if err != nil {
 		return nil, err
@@ -90,7 +90,7 @@ func CompassHeading(ctx context.Context, s resource.Sensor, extra map[string]int
 	return m, nil
 }
 
-func Orientation(ctx context.Context, s resource.Sensor, extra map[string]interface{}) (map[string]interface{}, error) {
+func orientationWrapper(ctx context.Context, s resource.Sensor, extra map[string]interface{}) (map[string]interface{}, error) {
 	ms, ok := s.(movementsensor.MovementSensor)
 	if !ok {
 		return nil, errors.New("type assertion to movement sensor failed")
@@ -106,7 +106,7 @@ func Orientation(ctx context.Context, s resource.Sensor, extra map[string]interf
 	return m, nil
 }
 
-func Accuracy(ctx context.Context, s resource.Sensor, extra map[string]interface{}) (map[string]interface{}, error,
+func accuracyHeader(ctx context.Context, s resource.Sensor, extra map[string]interface{}) (map[string]interface{}, error,
 ) {
 	ms, ok := s.(movementsensor.MovementSensor)
 	if !ok {
