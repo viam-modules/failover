@@ -191,12 +191,7 @@ func (ps *failoverPowerSensor) Readings(ctx context.Context, extra map[string]an
 
 	// Poll the last sensor we know is working
 	readings, err := common.TryReadingOrFail(ctx, ps.timeout, ps.lastWorkingSensor, common.ReadingsWrapper, extra)
-
 	if err == nil {
-		readings, ok := readings.(map[string]any)
-		if !ok {
-			return nil, errors.New("readings failed type assertion")
-		}
 		return readings, nil
 	}
 
@@ -214,11 +209,7 @@ func (ps *failoverPowerSensor) Readings(ctx context.Context, extra map[string]an
 	if err != nil {
 		return nil, errors.New("all power sensors failed to get readings")
 	}
-	readingsMap, ok := readings.(map[string]any)
-	if !ok {
-		return nil, errors.New("readings failed type assertion")
-	}
-	return readingsMap, nil
+	return readings, nil
 
 }
 

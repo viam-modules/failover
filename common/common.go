@@ -79,7 +79,7 @@ func TryReadingOrFail[K any](ctx context.Context,
 }
 
 // Since all sensors implement readings we can reuse the same wrapper for all models.
-func ReadingsWrapper(ctx context.Context, s resource.Sensor, extra map[string]any) (any, error) {
+func ReadingsWrapper(ctx context.Context, s resource.Sensor, extra map[string]any) (map[string]any, error) {
 	readings, err := s.Readings(ctx, extra)
 	if err != nil {
 		return nil, err
