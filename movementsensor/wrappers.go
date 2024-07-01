@@ -106,7 +106,7 @@ func orientationWrapper(ctx context.Context, s resource.Sensor, extra map[string
 	return m, nil
 }
 
-func accuracyHeader(ctx context.Context, s resource.Sensor, extra map[string]interface{}) (map[string]interface{}, error,
+func accuracyWrapper(ctx context.Context, s resource.Sensor, extra map[string]interface{}) (map[string]interface{}, error,
 ) {
 	ms, ok := s.(movementsensor.MovementSensor)
 	if !ok {
