@@ -414,14 +414,18 @@ func (ms *failoverMovementSensor) Orientation(ctx context.Context, extra map[str
 	return ori, nil
 }
 
-func (ms *failoverMovementSensor) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
+func (ms *failoverMovementSensor) Readings(ctx context.Context, extra map[string]any) (map[string]any, error) {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
 
 	// Poll the last sensor we know is working
 	readings, err := common.TryReadingOrFail(ctx, ms.timeout, ms.lastWorkingSensor, common.ReadingsWrapper, extra)
 	if err == nil {
-		return readings, nil
+		readingsMap, ok := readings.(map[string]any)
+		if !ok {
+			return nil, errors.New("readings failed type assertion")
+		}
+		return readingsMap, nil
 	}
 
 	// upon error of the last working sensor, log the error.
@@ -438,10 +442,14 @@ func (ms *failoverMovementSensor) Readings(ctx context.Context, extra map[string
 	if err != nil {
 		return nil, errors.New("all movement sensors failed to get readings")
 	}
-	return readings, nil
+	readingsMap, ok := readings.(map[string]any)
+	if !ok {
+		return nil, errors.New("readings failed type assertion")
+	}
+	return readingsMap, nil
 }
 
-func (ms *failoverMovementSensor) Accuracy(ctx context.Context, extra map[string]interface{}) (*movementsensor.Accuracy, error,
+func (ms *failoverMovementSensor) Accuracy(ctx context.Context, extra map[string]any) (*movementsensor.Accuracy, error,
 ) {
 	// Poll the last sensor we know is working
 	reading, err := common.TryReadingOrFail(ctx, ms.timeout, ms.lastWorkingSensor, accuracyWrapper, extra)
