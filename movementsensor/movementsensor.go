@@ -147,8 +147,6 @@ func newFailoverMovementSensor(ctx context.Context, deps resource.Dependencies, 
 		}
 	}
 
-	fmt.Println(len(s.readingsBackups))
-
 	s.lastWorkingSensor = primary
 
 	// default timeout is 1 second.
@@ -189,10 +187,11 @@ func (ms *failoverMovementSensor) Position(ctx context.Context, extra map[string
 	// Poll the last sensor we know is working
 	reading, err := common.TryReadingOrFail(ctx, ms.timeout, ms.lastWorkingSensor, positionWrapper, extra)
 	if err == nil {
-		pos, alt, err := common.Get2ReadingsFromMap[*geo.Point, float64](reading, "position", "altitude")
-		if err == nil {
+		pos, alt, newErr := common.Get2ReadingsFromMap[*geo.Point, float64](reading, "position", "altitude")
+		if newErr == nil {
 			return pos, alt, nil
 		}
+		err = newErr
 	}
 	// upon error of the last working sensor, log returned error.
 	ms.logger.Warnf(err.Error())
@@ -228,10 +227,11 @@ func (ms *failoverMovementSensor) LinearVelocity(ctx context.Context, extra map[
 	// Poll the last sensor we know is working
 	reading, err := common.TryReadingOrFail(ctx, ms.timeout, ms.lastWorkingSensor, linearVelocityWrapper, extra)
 	if err == nil {
-		vel, err := common.GetReadingFromMap[r3.Vector](reading, "velocity")
-		if err == nil {
+		vel, newErr := common.GetReadingFromMap[r3.Vector](reading, "velocity")
+		if newErr == nil {
 			return vel, nil
 		}
+		err = newErr
 	}
 	// upon error of the last working sensor, log returned error.
 	ms.logger.Warnf(err.Error())
@@ -266,10 +266,11 @@ func (ms *failoverMovementSensor) AngularVelocity(ctx context.Context, extra map
 
 	reading, err := common.TryReadingOrFail(ctx, ms.timeout, ms.lastWorkingSensor, angularVelocityWrapper, extra)
 	if err == nil {
-		vel, err := common.GetReadingFromMap[spatialmath.AngularVelocity](reading, "velocity")
-		if err == nil {
+		vel, newErr := common.GetReadingFromMap[spatialmath.AngularVelocity](reading, "velocity")
+		if newErr == nil {
 			return vel, nil
 		}
+		err = newErr
 	}
 	// upon error of the last working sensor, log returned error.
 	ms.logger.Warnf(err.Error())
@@ -304,13 +305,13 @@ func (ms *failoverMovementSensor) LinearAcceleration(ctx context.Context, extra 
 
 	reading, err := common.TryReadingOrFail(ctx, ms.timeout, ms.lastWorkingSensor, linearAccelerationWrapper, extra)
 	if err == nil {
-		acc, err := common.GetReadingFromMap[r3.Vector](reading, "acceleration")
-		if err == nil {
+		acc, newErr := common.GetReadingFromMap[r3.Vector](reading, "acceleration")
+		if newErr == nil {
 			return acc, nil
 		}
+		err = newErr
 	}
 
-	fmt.Println(err)
 	// upon error of the last working sensor, log returned error.
 	ms.logger.Warnf(err.Error())
 
@@ -385,10 +386,11 @@ func (ms *failoverMovementSensor) Orientation(ctx context.Context, extra map[str
 
 	reading, err := common.TryReadingOrFail(ctx, ms.timeout, ms.lastWorkingSensor, orientationWrapper, extra)
 	if err == nil {
-		ori, err := common.GetReadingFromMap[spatialmath.Orientation](reading, "orientation")
-		if err == nil {
+		ori, newErr := common.GetReadingFromMap[spatialmath.Orientation](reading, "orientation")
+		if newErr == nil {
 			return ori, nil
 		}
+		err = newErr
 	}
 	// upon error of the last working sensor, log returned error.
 	ms.logger.Warnf(err.Error())
@@ -463,11 +465,11 @@ func (ms *failoverMovementSensor) Accuracy(ctx context.Context, extra map[string
 
 	reading, err = tryBackups(ctx, ms, ms.allBackups, accuracyWrapper, extra)
 	if err != nil {
-		return nil, fmt.Errorf("all movement sensors failed to get orientation: %w", err)
+		return nil, fmt.Errorf("all movement sensors failed to get accuracy: %w", err)
 	}
-	acc, newErr := common.GetReadingFromMap[spatialmath.Orientation](reading, "orientation")
+	acc, err := common.GetReadingFromMap[*movementsensor.Accuracy](reading, "accuracy")
 	if err != nil {
-		return nil, fmt.Errorf("all movement sensors failed to get orientation: %w", err)
+		return nil, fmt.Errorf("all movement sensors failed to get accuracy: %w", err)
 	}
 	return acc, nil
 }
@@ -475,7 +477,7 @@ func (ms *failoverMovementSensor) Accuracy(ctx context.Context, extra map[string
 func (s *failoverMovementSensor) Properties(ctx context.Context, extra map[string]interface{}) (*movementsensor.Properties, error) {
 	props, err := s.primary.Properties(ctx, extra)
 	if err != nil {
-		return nil, errors.New("failed to get properties")
+		return nil, err
 	}
 
 	return props, nil
