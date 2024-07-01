@@ -16,25 +16,25 @@ type voltageVals struct {
 	isAc  bool
 }
 
-func voltageWrapper(ctx context.Context, ps resource.Sensor, extra map[string]any) (any, error) {
+func voltageWrapper(ctx context.Context, ps resource.Sensor, extra map[string]any) (voltageVals, error) {
 
-	ret := voltageVals{}
+	vals := voltageVals{}
 
 	powersensor, ok := ps.(powersensor.PowerSensor)
 	if !ok {
-		return ret, errors.New("type assertion to power sensor failed")
+		return vals, errors.New("type assertion to power sensor failed")
 	}
 
 	volts, isAc, err := powersensor.Voltage(ctx, extra)
 
 	if err != nil {
-		return ret, err
+		return vals, err
 	}
 
-	ret.volts = volts
-	ret.isAc = isAc
+	vals.volts = volts
+	vals.isAc = isAc
 
-	return ret, nil
+	return vals, nil
 }
 
 type currentVals struct {
@@ -42,33 +42,33 @@ type currentVals struct {
 	isAc bool
 }
 
-func currentWrapper(ctx context.Context, ps resource.Sensor, extra map[string]any) (any, error) {
-	ret := currentVals{}
+func currentWrapper(ctx context.Context, ps resource.Sensor, extra map[string]any) (currentVals, error) {
+	vals := currentVals{}
 
 	powersensor, ok := ps.(powersensor.PowerSensor)
 	if !ok {
-		return nil, errors.New("type assertion to power sensor failed")
+		return vals, errors.New("type assertion to power sensor failed")
 	}
 
 	amps, isAc, err := powersensor.Current(ctx, extra)
 	if err != nil {
-		return nil, err
+		return vals, err
 	}
 
-	ret.amps = amps
-	ret.isAc = isAc
+	vals.amps = amps
+	vals.isAc = isAc
 
-	return ret, nil
+	return vals, nil
 }
 
-func powerWrapper(ctx context.Context, ps resource.Sensor, extra map[string]any) (any, error) {
+func powerWrapper(ctx context.Context, ps resource.Sensor, extra map[string]any) (float64, error) {
 	powersensor, ok := ps.(powersensor.PowerSensor)
 	if !ok {
-		return nil, errors.New("type assertion to power sensor failed")
+		return 0, errors.New("type assertion to power sensor failed")
 	}
 	watts, err := powersensor.Power(ctx, extra)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 	return watts, nil
 }
