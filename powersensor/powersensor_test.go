@@ -162,15 +162,15 @@ func TestPower(t *testing.T) {
 		s, err := newFailoverPowerSensor(ctx, deps, config, logger)
 		test.That(t, err, test.ShouldBeNil)
 
-		sensors.primary.PowerFunc = func(ctx context.Context, extra map[string]interface{}) (float64, error) {
+		sensors.primary.PowerFunc = func(ctx context.Context, extra map[string]any) (float64, error) {
 			time.Sleep(time.Duration(tc.primaryTimeSeconds) * time.Second)
 			return tc.primaryPower, tc.primaryErr
 		}
 
-		sensors.backup1.PowerFunc = func(ctx context.Context, extra map[string]interface{}) (float64, error) {
+		sensors.backup1.PowerFunc = func(ctx context.Context, extra map[string]any) (float64, error) {
 			return tc.backup1Power, tc.backup1Err
 		}
-		sensors.backup2.PowerFunc = func(ctx context.Context, extra map[string]interface{}) (float64, error) {
+		sensors.backup2.PowerFunc = func(ctx context.Context, extra map[string]any) (float64, error) {
 			return tc.backup2Power, tc.backup2Err
 		}
 
@@ -260,15 +260,15 @@ func TestCurrent(t *testing.T) {
 		s, err := newFailoverPowerSensor(ctx, deps, config, logger)
 		test.That(t, err, test.ShouldBeNil)
 
-		sensors.primary.CurrentFunc = func(ctx context.Context, extra map[string]interface{}) (float64, bool, error) {
+		sensors.primary.CurrentFunc = func(ctx context.Context, extra map[string]any) (float64, bool, error) {
 			time.Sleep(time.Duration(tc.primaryTimeSeconds) * time.Second)
 			return tc.primaryCurrent, false, tc.primaryErr
 		}
 
-		sensors.backup1.CurrentFunc = func(ctx context.Context, extra map[string]interface{}) (float64, bool, error) {
+		sensors.backup1.CurrentFunc = func(ctx context.Context, extra map[string]any) (float64, bool, error) {
 			return tc.backup1Current, false, tc.backup1Err
 		}
-		sensors.backup2.CurrentFunc = func(ctx context.Context, extra map[string]interface{}) (float64, bool, error) {
+		sensors.backup2.CurrentFunc = func(ctx context.Context, extra map[string]any) (float64, bool, error) {
 			return tc.backup2Current, false, tc.backup2Err
 		}
 
@@ -359,15 +359,15 @@ func TestVoltage(t *testing.T) {
 		s, err := newFailoverPowerSensor(ctx, deps, config, logger)
 		test.That(t, err, test.ShouldBeNil)
 
-		sensors.primary.VoltageFunc = func(ctx context.Context, extra map[string]interface{}) (float64, bool, error) {
+		sensors.primary.VoltageFunc = func(ctx context.Context, extra map[string]any) (float64, bool, error) {
 			time.Sleep(time.Duration(tc.primaryTimeSeconds) * time.Second)
 			return tc.primaryVoltage, false, tc.primaryErr
 		}
 
-		sensors.backup1.VoltageFunc = func(ctx context.Context, extra map[string]interface{}) (float64, bool, error) {
+		sensors.backup1.VoltageFunc = func(ctx context.Context, extra map[string]any) (float64, bool, error) {
 			return tc.backup1Voltage, false, tc.backup1Err
 		}
-		sensors.backup2.VoltageFunc = func(ctx context.Context, extra map[string]interface{}) (float64, bool, error) {
+		sensors.backup2.VoltageFunc = func(ctx context.Context, extra map[string]any) (float64, bool, error) {
 			return tc.backup2Voltage, false, tc.backup2Err
 		}
 
@@ -399,44 +399,44 @@ func TestReadings(t *testing.T) {
 	var tests = []struct {
 		name string
 
-		primaryReading     map[string]interface{}
+		primaryReading     map[string]any
 		primaryErr         error
-		backup1Reading     map[string]interface{}
+		backup1Reading     map[string]any
 		backup1Err         error
-		backup2Reading     map[string]interface{}
+		backup2Reading     map[string]any
 		backup2Err         error
-		expectedReading    map[string]interface{}
+		expectedReading    map[string]any
 		primaryTimeSeconds int
 		expectErr          bool
 	}{
 		{
 			name:            "if the primary succeeds, should return primary reading",
-			primaryReading:  map[string]interface{}{"primary_reading": 1},
-			backup1Reading:  map[string]interface{}{"a": 1},
-			expectedReading: map[string]interface{}{"primary_reading": 1},
+			primaryReading:  map[string]any{"primary_reading": 1},
+			backup1Reading:  map[string]any{"a": 1},
+			expectedReading: map[string]any{"primary_reading": 1},
 		},
 		{
 			name:            "if the primary fails, backup1 is returned",
 			primaryReading:  nil,
 			primaryErr:      errTest,
-			backup1Reading:  map[string]interface{}{"a": 1},
-			expectedReading: map[string]interface{}{"a": 1},
+			backup1Reading:  map[string]any{"a": 1},
+			expectedReading: map[string]any{"a": 1},
 			expectErr:       false,
 		},
 		{
 			name:            "if primary and backup1 fail, backup2 is returned",
 			primaryErr:      errTest,
 			backup1Err:      errTest,
-			backup2Reading:  map[string]interface{}{"a": 2},
-			expectedReading: map[string]interface{}{"a": 2},
+			backup2Reading:  map[string]any{"a": 2},
+			expectedReading: map[string]any{"a": 2},
 			expectErr:       false,
 		},
 		{
 			name:               "a reading should timeout after default of 1 second",
 			primaryTimeSeconds: 1,
-			primaryReading:     map[string]interface{}{"a": 1},
-			backup1Reading:     map[string]interface{}{"a": 2},
-			expectedReading:    map[string]interface{}{"a": 2},
+			primaryReading:     map[string]any{"a": 1},
+			backup1Reading:     map[string]any{"a": 2},
+			expectedReading:    map[string]any{"a": 2},
 			expectErr:          false,
 		},
 		{
@@ -454,15 +454,15 @@ func TestReadings(t *testing.T) {
 		s, err := newFailoverPowerSensor(ctx, deps, config, logger)
 		test.That(t, err, test.ShouldBeNil)
 
-		sensors.primary.ReadingsFunc = func(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
+		sensors.primary.ReadingsFunc = func(ctx context.Context, extra map[string]any) (map[string]any, error) {
 			time.Sleep(time.Duration(tc.primaryTimeSeconds) * time.Second)
 			return tc.primaryReading, tc.primaryErr
 		}
 
-		sensors.backup1.ReadingsFunc = func(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
+		sensors.backup1.ReadingsFunc = func(ctx context.Context, extra map[string]any) (map[string]any, error) {
 			return tc.backup1Reading, tc.backup1Err
 		}
-		sensors.backup2.ReadingsFunc = func(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
+		sensors.backup2.ReadingsFunc = func(ctx context.Context, extra map[string]any) (map[string]any, error) {
 			return tc.backup2Reading, tc.backup2Err
 		}
 

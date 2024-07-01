@@ -174,7 +174,7 @@ func newFailoverMovementSensor(ctx context.Context, deps resource.Dependencies, 
 	return s, nil
 }
 
-func (ms *failoverMovementSensor) Position(ctx context.Context, extra map[string]interface{}) (*geo.Point, float64, error) {
+func (ms *failoverMovementSensor) Position(ctx context.Context, extra map[string]any) (*geo.Point, float64, error) {
 
 	props, err := ms.Properties(ctx, extra)
 	if err != nil {
@@ -187,11 +187,7 @@ func (ms *failoverMovementSensor) Position(ctx context.Context, extra map[string
 	// Poll the last sensor we know is working
 	reading, err := common.TryReadingOrFail(ctx, ms.timeout, ms.lastWorkingSensor, positionWrapper, extra)
 	if err == nil {
-		pos, alt, newErr := common.Get2ReadingsFromMap[*geo.Point, float64](reading, "position", "altitude")
-		if newErr == nil {
-			return pos, alt, nil
-		}
-		err = newErr
+		return reading.position, reading.altitiude, nil
 	}
 	// upon error of the last working sensor, log returned error.
 	ms.logger.Warnf(err.Error())
@@ -208,14 +204,10 @@ func (ms *failoverMovementSensor) Position(ctx context.Context, extra map[string
 	if err != nil {
 		return nil, 0, errors.New("all movement sensors failed to get position")
 	}
-	pos, alt, err := common.Get2ReadingsFromMap[*geo.Point, float64](reading, "position", "altitude")
-	if err != nil {
-		return nil, 0, fmt.Errorf("all movement sensors failed to get position: %w", err)
-	}
-	return pos, alt, nil
+	return reading.position, reading.altitiude, nil
 }
 
-func (ms *failoverMovementSensor) LinearVelocity(ctx context.Context, extra map[string]interface{}) (r3.Vector, error) {
+func (ms *failoverMovementSensor) LinearVelocity(ctx context.Context, extra map[string]any) (r3.Vector, error) {
 	props, err := ms.Properties(ctx, extra)
 	if err != nil {
 		return r3.Vector{}, err
@@ -225,13 +217,9 @@ func (ms *failoverMovementSensor) LinearVelocity(ctx context.Context, extra map[
 	}
 
 	// Poll the last sensor we know is working
-	reading, err := common.TryReadingOrFail(ctx, ms.timeout, ms.lastWorkingSensor, linearVelocityWrapper, extra)
+	vel, err := common.TryReadingOrFail(ctx, ms.timeout, ms.lastWorkingSensor, linearVelocityWrapper, extra)
 	if err == nil {
-		vel, newErr := common.GetReadingFromMap[r3.Vector](reading, "velocity")
-		if newErr == nil {
-			return vel, nil
-		}
-		err = newErr
+		return vel, nil
 	}
 	// upon error of the last working sensor, log returned error.
 	ms.logger.Warnf(err.Error())
@@ -244,18 +232,14 @@ func (ms *failoverMovementSensor) LinearVelocity(ctx context.Context, extra map[
 	}
 
 	// Start reading from the list of backup sensors until one succeeds.
-	reading, err = tryBackups(ctx, ms, ms.linearVelocityBackups, linearVelocityWrapper, extra)
+	vel, err = tryBackups(ctx, ms, ms.linearVelocityBackups, linearVelocityWrapper, extra)
 	if err != nil {
 		return r3.Vector{}, errors.New("all movement sensors failed to get linear velocity")
-	}
-	vel, err := common.GetReadingFromMap[r3.Vector](reading, "velocity")
-	if err != nil {
-		return r3.Vector{}, fmt.Errorf("all movement sensors failed to get linear velocity: %w", err)
 	}
 	return vel, nil
 }
 
-func (ms *failoverMovementSensor) AngularVelocity(ctx context.Context, extra map[string]interface{}) (spatialmath.AngularVelocity, error) {
+func (ms *failoverMovementSensor) AngularVelocity(ctx context.Context, extra map[string]any) (spatialmath.AngularVelocity, error) {
 	props, err := ms.Properties(ctx, extra)
 	if err != nil {
 		return spatialmath.AngularVelocity{}, err
@@ -264,13 +248,9 @@ func (ms *failoverMovementSensor) AngularVelocity(ctx context.Context, extra map
 		return spatialmath.AngularVelocity{}, movementsensor.ErrMethodUnimplementedAngularVelocity
 	}
 
-	reading, err := common.TryReadingOrFail(ctx, ms.timeout, ms.lastWorkingSensor, angularVelocityWrapper, extra)
+	vel, err := common.TryReadingOrFail(ctx, ms.timeout, ms.lastWorkingSensor, angularVelocityWrapper, extra)
 	if err == nil {
-		vel, newErr := common.GetReadingFromMap[spatialmath.AngularVelocity](reading, "velocity")
-		if newErr == nil {
-			return vel, nil
-		}
-		err = newErr
+		return vel, nil
 	}
 	// upon error of the last working sensor, log returned error.
 	ms.logger.Warnf(err.Error())
@@ -283,18 +263,14 @@ func (ms *failoverMovementSensor) AngularVelocity(ctx context.Context, extra map
 	}
 
 	// Start reading from the list of backup sensors until one succeeds.
-	reading, err = tryBackups(ctx, ms, ms.angularVelocityBackups, angularVelocityWrapper, extra)
+	vel, err = tryBackups(ctx, ms, ms.angularVelocityBackups, angularVelocityWrapper, extra)
 	if err != nil {
 		return spatialmath.AngularVelocity{}, errors.New("all movement sensors failed to get angular velocity")
-	}
-	vel, err := common.GetReadingFromMap[spatialmath.AngularVelocity](reading, "velocity")
-	if err != nil {
-		return spatialmath.AngularVelocity{}, fmt.Errorf("all movement sensors failed to get angular velocity: %w", err)
 	}
 	return vel, nil
 }
 
-func (ms *failoverMovementSensor) LinearAcceleration(ctx context.Context, extra map[string]interface{}) (r3.Vector, error) {
+func (ms *failoverMovementSensor) LinearAcceleration(ctx context.Context, extra map[string]any) (r3.Vector, error) {
 	props, err := ms.Properties(ctx, extra)
 	if err != nil {
 		return r3.Vector{}, err
@@ -303,13 +279,9 @@ func (ms *failoverMovementSensor) LinearAcceleration(ctx context.Context, extra 
 		return r3.Vector{}, movementsensor.ErrMethodUnimplementedLinearAcceleration
 	}
 
-	reading, err := common.TryReadingOrFail(ctx, ms.timeout, ms.lastWorkingSensor, linearAccelerationWrapper, extra)
+	acc, err := common.TryReadingOrFail(ctx, ms.timeout, ms.lastWorkingSensor, linearAccelerationWrapper, extra)
 	if err == nil {
-		acc, newErr := common.GetReadingFromMap[r3.Vector](reading, "acceleration")
-		if newErr == nil {
-			return acc, nil
-		}
-		err = newErr
+		return acc, nil
 	}
 
 	// upon error of the last working sensor, log returned error.
@@ -323,20 +295,15 @@ func (ms *failoverMovementSensor) LinearAcceleration(ctx context.Context, extra 
 	}
 
 	// Start reading from the list of backup sensors until one succeeds.
-	reading, err = tryBackups(ctx, ms, ms.linearAccelerationBackups, linearAccelerationWrapper, extra)
+	acc, err = tryBackups(ctx, ms, ms.linearAccelerationBackups, linearAccelerationWrapper, extra)
 	if err != nil {
 		return r3.Vector{}, errors.New("all movement sensors failed to get linear acceleration")
 	}
-	acc, err := common.GetReadingFromMap[r3.Vector](reading, "velocity")
-	if err != nil {
-		return r3.Vector{}, fmt.Errorf("all movement sensors failed to get linear acceleration: %w", err)
-	}
-
 	return acc, nil
 
 }
 
-func (ms *failoverMovementSensor) CompassHeading(ctx context.Context, extra map[string]interface{}) (float64, error) {
+func (ms *failoverMovementSensor) CompassHeading(ctx context.Context, extra map[string]any) (float64, error) {
 	props, err := ms.Properties(ctx, extra)
 	if err != nil {
 		return 0, err
@@ -345,13 +312,9 @@ func (ms *failoverMovementSensor) CompassHeading(ctx context.Context, extra map[
 		return 0, movementsensor.ErrMethodUnimplementedCompassHeading
 	}
 
-	reading, err := common.TryReadingOrFail(ctx, ms.timeout, ms.lastWorkingSensor, compassHeadingWrapper, extra)
+	heading, err := common.TryReadingOrFail(ctx, ms.timeout, ms.lastWorkingSensor, compassHeadingWrapper, extra)
 	if err == nil {
-		heading, newErr := common.GetReadingFromMap[float64](reading, "heading")
-		if newErr == nil {
-			return heading, nil
-		}
-		err = newErr
+		return heading, nil
 	}
 	// upon error of the last working sensor, log returned error.
 	ms.logger.Warnf(err.Error())
@@ -364,18 +327,14 @@ func (ms *failoverMovementSensor) CompassHeading(ctx context.Context, extra map[
 	}
 
 	// Start reading from the list of backup sensors until one succeeds.
-	reading, err = tryBackups(ctx, ms, ms.compassHeadingBackups, compassHeadingWrapper, extra)
+	heading, err = tryBackups(ctx, ms, ms.compassHeadingBackups, compassHeadingWrapper, extra)
 	if err != nil {
 		return 0, errors.New("all movement sensors failed to get compass heading")
-	}
-	heading, err := common.GetReadingFromMap[float64](reading, "heading")
-	if err != nil {
-		return 0, fmt.Errorf("all movement sensors failed to get compass heading: %w", err)
 	}
 	return heading, nil
 }
 
-func (ms *failoverMovementSensor) Orientation(ctx context.Context, extra map[string]interface{}) (spatialmath.Orientation, error) {
+func (ms *failoverMovementSensor) Orientation(ctx context.Context, extra map[string]any) (spatialmath.Orientation, error) {
 	props, err := ms.Properties(ctx, extra)
 	if err != nil {
 		return nil, err
@@ -384,13 +343,9 @@ func (ms *failoverMovementSensor) Orientation(ctx context.Context, extra map[str
 		return nil, movementsensor.ErrMethodUnimplementedOrientation
 	}
 
-	reading, err := common.TryReadingOrFail(ctx, ms.timeout, ms.lastWorkingSensor, orientationWrapper, extra)
+	ori, err := common.TryReadingOrFail(ctx, ms.timeout, ms.lastWorkingSensor, orientationWrapper, extra)
 	if err == nil {
-		ori, newErr := common.GetReadingFromMap[spatialmath.Orientation](reading, "orientation")
-		if newErr == nil {
-			return ori, nil
-		}
-		err = newErr
+		return ori, nil
 	}
 	// upon error of the last working sensor, log returned error.
 	ms.logger.Warnf(err.Error())
@@ -403,13 +358,9 @@ func (ms *failoverMovementSensor) Orientation(ctx context.Context, extra map[str
 	}
 
 	// Start reading from the list of backup sensors until one succeeds.
-	reading, err = tryBackups(ctx, ms, ms.orientationBackups, orientationWrapper, extra)
+	ori, err = tryBackups(ctx, ms, ms.orientationBackups, orientationWrapper, extra)
 	if err != nil {
 		return nil, errors.New("all movement sensors failed to get orientation")
-	}
-	ori, err := common.GetReadingFromMap[spatialmath.Orientation](reading, "orientation")
-	if err != nil {
-		return nil, fmt.Errorf("all movement sensors failed to get orientation: %w", err)
 	}
 	return ori, nil
 }
@@ -421,11 +372,7 @@ func (ms *failoverMovementSensor) Readings(ctx context.Context, extra map[string
 	// Poll the last sensor we know is working
 	readings, err := common.TryReadingOrFail(ctx, ms.timeout, ms.lastWorkingSensor, common.ReadingsWrapper, extra)
 	if err == nil {
-		readingsMap, ok := readings.(map[string]any)
-		if !ok {
-			return nil, errors.New("readings failed type assertion")
-		}
-		return readingsMap, nil
+		return readings, nil
 	}
 
 	// upon error of the last working sensor, log the error.
@@ -442,23 +389,16 @@ func (ms *failoverMovementSensor) Readings(ctx context.Context, extra map[string
 	if err != nil {
 		return nil, errors.New("all movement sensors failed to get readings")
 	}
-	readingsMap, ok := readings.(map[string]any)
-	if !ok {
-		return nil, errors.New("readings failed type assertion")
-	}
-	return readingsMap, nil
+
+	return readings, nil
 }
 
 func (ms *failoverMovementSensor) Accuracy(ctx context.Context, extra map[string]any) (*movementsensor.Accuracy, error,
 ) {
 	// Poll the last sensor we know is working
-	reading, err := common.TryReadingOrFail(ctx, ms.timeout, ms.lastWorkingSensor, accuracyWrapper, extra)
+	acc, err := common.TryReadingOrFail(ctx, ms.timeout, ms.lastWorkingSensor, accuracyWrapper, extra)
 	if err == nil {
-		acc, lastErr := common.GetReadingFromMap[*movementsensor.Accuracy](reading, "accuracy")
-		if lastErr == nil {
-			return acc, nil
-		}
-		err = lastErr
+		return acc, nil
 	}
 
 	// upon error of the last working sensor, log the error.
@@ -471,18 +411,15 @@ func (ms *failoverMovementSensor) Accuracy(ctx context.Context, extra map[string
 	default:
 	}
 
-	reading, err = tryBackups(ctx, ms, ms.allBackups, accuracyWrapper, extra)
+	acc, err = tryBackups(ctx, ms, ms.allBackups, accuracyWrapper, extra)
 	if err != nil {
 		return nil, fmt.Errorf("all movement sensors failed to get accuracy: %w", err)
 	}
-	acc, err := common.GetReadingFromMap[*movementsensor.Accuracy](reading, "accuracy")
-	if err != nil {
-		return nil, fmt.Errorf("all movement sensors failed to get accuracy: %w", err)
-	}
+
 	return acc, nil
 }
 
-func (s *failoverMovementSensor) Properties(ctx context.Context, extra map[string]interface{}) (*movementsensor.Properties, error) {
+func (s *failoverMovementSensor) Properties(ctx context.Context, extra map[string]any) (*movementsensor.Properties, error) {
 	props, err := s.primary.Properties(ctx, extra)
 	if err != nil {
 		return nil, err
@@ -494,8 +431,8 @@ func (s *failoverMovementSensor) Properties(ctx context.Context, extra map[strin
 func tryBackups[T any](ctx context.Context,
 	ms *failoverMovementSensor,
 	backups []movementsensor.MovementSensor,
-	call func(ctx context.Context, ps resource.Sensor, extra map[string]interface{}) (T, error),
-	extra map[string]interface{}) (
+	call func(ctx context.Context, ps resource.Sensor, extra map[string]any) (T, error),
+	extra map[string]any) (
 	T, error) {
 	var zero T
 	for _, backup := range backups {
@@ -520,16 +457,14 @@ func tryBackups[T any](ctx context.Context,
 // then continuously polls the primary sensor until it returns a reading, and replaces lastWorkingSensor.
 func PollPrimaryForHealth[K any](s *failoverMovementSensor,
 	startChan chan bool,
-	call func(context.Context, resource.Sensor, map[string]interface{}) (K, error)) {
+	call func(context.Context, resource.Sensor, map[string]any) (K, error)) {
 	// poll every 10 ms.
 	ticker := time.NewTicker(time.Millisecond * 10)
 	s.workers.AddWorkers(func(ctx context.Context) {
 		for {
-			fmt.Println("waiting poll primary")
 			select {
 			// wait for data to come into the channel before polling.
 			case <-ctx.Done():
-				fmt.Println("ctx done")
 				return
 			case <-startChan:
 			}
@@ -564,5 +499,7 @@ func (s *failoverMovementSensor) Close(context.Context) error {
 	close(s.linearAccChan)
 	close(s.linearVelocityChan)
 	close(s.angularVelocityChan)
+	close(s.pollAccuracyChan)
+	close(s.pollReadingsChan)
 	return nil
 }
