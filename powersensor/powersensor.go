@@ -103,13 +103,15 @@ func (ps *failoverPowerSensor) Voltage(ctx context.Context, extra map[string]int
 	// Poll the last sensor we know is working
 	readings, err := common.TryReadingOrFail(ctx, ps.timeout, ps.lastWorkingSensor, voltageWrapper, extra)
 	if err == nil {
-		volts, isAC, err := common.Get2ReadingsFromMap[float64, bool](readings, "volts", "isAC")
-		if err == nil {
+		volts, isAC, newErr := common.Get2ReadingsFromMap[float64, bool](readings, "volts", "isAC")
+		if newErr == nil {
 			return volts, isAC, nil
 		}
+		err = newErr
 	}
+
 	// upon error of the last working sensor, log the error.
-	ps.logger.Warnf("powersensor %s failed to get voltage: %s", ps.lastWorkingSensor.Name().ShortName(), error.Error(err))
+	ps.logger.Warnf("powersensor %s failed to get voltage: %s", ps.lastWorkingSensor.Name().ShortName(), err.Error())
 
 	// If the primary failed, tell the goroutine to start checking the health.
 	switch ps.lastWorkingSensor {
@@ -139,10 +141,12 @@ func (ps *failoverPowerSensor) Current(ctx context.Context, extra map[string]int
 	// Poll the last sensor we know is working
 	readings, err := common.TryReadingOrFail(ctx, ps.timeout, ps.lastWorkingSensor, currentWrapper, extra)
 	if err == nil {
-		current, isAC, err := common.Get2ReadingsFromMap[float64, bool](readings, "amps", "isAC")
-		if err == nil {
+		current, isAC, newErr := common.Get2ReadingsFromMap[float64, bool](readings, "amps", "isAC")
+		if newErr == nil {
 			return current, isAC, nil
 		}
+		err = newErr
+
 	}
 	// upon error of the last working sensor, log the error.
 	ps.logger.Warnf("powersensor %s failed to get current: %s", ps.lastWorkingSensor.Name().ShortName(), err.Error())
@@ -174,10 +178,11 @@ func (ps *failoverPowerSensor) Power(ctx context.Context, extra map[string]inter
 	// Poll the last sensor we know is working
 	readings, err := common.TryReadingOrFail(ctx, ps.timeout, ps.lastWorkingSensor, powerWrapper, extra)
 	if err == nil {
-		watts, err := common.GetReadingFromMap[float64](readings, "watts")
-		if err == nil {
+		watts, newErr := common.GetReadingFromMap[float64](readings, "watts")
+		if newErr == nil {
 			return watts, nil
 		}
+		err = newErr
 	}
 	// upon error of the last working sensor, log the error.
 	ps.logger.Warnf("powersensor %s failed to get power: %s", ps.lastWorkingSensor.Name().ShortName(), err.Error())
