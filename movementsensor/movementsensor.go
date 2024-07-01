@@ -264,10 +264,11 @@ func (ms *failoverMovementSensor) LinearAcceleration(ctx context.Context, extra 
 func (ms *failoverMovementSensor) CompassHeading(ctx context.Context, extra map[string]interface{}) (float64, error) {
 	reading, err := common.TryReadingOrFail(ctx, ms.timeout, ms.lastWorkingSensor, compassHeadingWrapper, extra)
 	if err == nil {
-		heading, err := common.GetReadingFromMap[float64](reading, "heading")
-		if err == nil {
+		heading, newErr := common.GetReadingFromMap[float64](reading, "heading")
+		if newErr == nil {
 			return heading, nil
 		}
+		err = newErr
 	}
 
 	fmt.Println("ERROR HERE:")
@@ -285,11 +286,11 @@ func (ms *failoverMovementSensor) CompassHeading(ctx context.Context, extra map[
 	// Start reading from the list of backup sensors until one succeeds.
 	reading, err = tryBackups(ctx, ms, ms.compassHeadingBackups, compassHeadingWrapper, extra)
 	if err != nil {
-		return 0, errors.New("all movement sensors failed to get linear velocity")
+		return 0, errors.New("all movement sensors failed to get compass heading")
 	}
 	heading, err := common.GetReadingFromMap[float64](reading, "heading")
 	if err != nil {
-		return 0, fmt.Errorf("all movement sensors failed to get linear velocity: %w", err)
+		return 0, fmt.Errorf("all movement sensors failed to get compass heading: %w", err)
 	}
 	return heading, nil
 }
