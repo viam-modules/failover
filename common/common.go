@@ -44,8 +44,8 @@ type ReadingsResult struct {
 }
 
 // getReading calls the inputted API call and returns the reading and error as a ReadingsResult struct.
-func getReading[K any](ctx context.Context, call func(context.Context, resource.Sensor, map[string]any) (K, error), sensor resource.Sensor, extra map[string]any) ReadingsResult {
-	reading, err := call(ctx, sensor, extra)
+func getReading[K any](ctx context.Context, call func(context.Context, resource.Sensor, map[string]any) (K, error), s resource.Sensor, extra map[string]any) ReadingsResult {
+	reading, err := call(ctx, s, extra)
 
 	return ReadingsResult{
 		readings: reading,

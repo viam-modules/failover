@@ -16,25 +16,18 @@ type voltageVals struct {
 	isAc  bool
 }
 
-func voltageWrapper(ctx context.Context, ps resource.Sensor, extra map[string]any) (voltageVals, error) {
-
-	vals := voltageVals{}
-
+func voltageWrapper(ctx context.Context, ps resource.Sensor, extra map[string]any) (*voltageVals, error) {
 	powersensor, ok := ps.(powersensor.PowerSensor)
 	if !ok {
-		return vals, errors.New("type assertion to power sensor failed")
+		return nil, errors.New("type assertion to power sensor failed")
 	}
 
 	volts, isAc, err := powersensor.Voltage(ctx, extra)
-
 	if err != nil {
-		return vals, err
+		return nil, err
 	}
 
-	vals.volts = volts
-	vals.isAc = isAc
-
-	return vals, nil
+	return &voltageVals{volts: volts, isAc: isAc}, nil
 }
 
 type currentVals struct {
@@ -42,23 +35,18 @@ type currentVals struct {
 	isAc bool
 }
 
-func currentWrapper(ctx context.Context, ps resource.Sensor, extra map[string]any) (currentVals, error) {
-	vals := currentVals{}
-
+func currentWrapper(ctx context.Context, ps resource.Sensor, extra map[string]any) (*currentVals, error) {
 	powersensor, ok := ps.(powersensor.PowerSensor)
 	if !ok {
-		return vals, errors.New("type assertion to power sensor failed")
+		return nil, errors.New("type assertion to power sensor failed")
 	}
 
 	amps, isAc, err := powersensor.Current(ctx, extra)
 	if err != nil {
-		return vals, err
+		return nil, err
 	}
 
-	vals.amps = amps
-	vals.isAc = isAc
-
-	return vals, nil
+	return &currentVals{amps: amps, isAc: isAc}, nil
 }
 
 func powerWrapper(ctx context.Context, ps resource.Sensor, extra map[string]any) (float64, error) {

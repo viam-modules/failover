@@ -26,11 +26,6 @@ func init() {
 	)
 }
 
-type returnVals struct {
-	returnVal1 any
-	returnVal2 any
-}
-
 type failoverPowerSensor struct {
 	resource.AlwaysRebuild
 	resource.Named
