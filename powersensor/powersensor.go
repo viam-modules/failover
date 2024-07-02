@@ -5,6 +5,7 @@ import (
 	"errors"
 	"failover/common"
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -120,7 +121,7 @@ func (ps *failoverPowerSensor) Voltage(ctx context.Context, extra map[string]any
 
 	readings, err = tryBackups(ctx, ps, voltageWrapper, extra)
 	if err != nil {
-		return 0, false, errors.New("all power sensors failed to get voltage")
+		return math.NaN(), false, errors.New("all power sensors failed to get voltage")
 	}
 
 	return readings.volts, readings.isAc, nil
@@ -151,7 +152,7 @@ func (ps *failoverPowerSensor) Current(ctx context.Context, extra map[string]any
 
 	currentVals, err = tryBackups(ctx, ps, currentWrapper, extra)
 	if err != nil {
-		return 0, false, errors.New("all power sensors failed to get current")
+		return math.NaN(), false, errors.New("all power sensors failed to get current")
 	}
 	return currentVals.amps, currentVals.isAc, nil
 }
@@ -179,7 +180,7 @@ func (ps *failoverPowerSensor) Power(ctx context.Context, extra map[string]any) 
 
 	watts, err = tryBackups(ctx, ps, powerWrapper, extra)
 	if err != nil {
-		return 0, errors.New("all power sensors failed to get power")
+		return math.NaN(), errors.New("all power sensors failed to get power")
 	}
 	return watts, nil
 }
