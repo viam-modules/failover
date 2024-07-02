@@ -157,6 +157,7 @@ func TestPower(t *testing.T) {
 	}
 
 	for _, tc := range tests {
+
 		goRoutinesStart := runtime.NumGoroutine()
 		s, err := newFailoverPowerSensor(ctx, deps, config, logger)
 		test.That(t, err, test.ShouldBeNil)
