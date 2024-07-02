@@ -107,7 +107,9 @@ func newFailoverPowerSensor(ctx context.Context, deps resource.Dependencies, con
 func (ps *failoverPowerSensor) Voltage(ctx context.Context, extra map[string]any) (float64, bool, error) {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
-	// Poll the last sensor we know is working
+
+	// Poll the last sensor we know is working.
+	// In the non-error case, the wrapper will never return its readings as nil.
 	readings, err := common.TryReadingOrFail(ctx, ps.timeout, ps.lastWorkingVoltage, voltageWrapper, extra)
 
 	if err == nil {
@@ -138,7 +140,9 @@ func (ps *failoverPowerSensor) Voltage(ctx context.Context, extra map[string]any
 func (ps *failoverPowerSensor) Current(ctx context.Context, extra map[string]any) (float64, bool, error) {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
-	// Poll the last sensor we know is working
+
+	// Poll the last sensor we know is working.
+	// In the non-error case, the wrapper will never return its readings as nil.
 	currentVals, err := common.TryReadingOrFail(ctx, ps.timeout, ps.lastWorkingCurrent, currentWrapper, extra)
 	if err == nil {
 		return currentVals.amps, currentVals.isAc, nil
@@ -167,7 +171,8 @@ func (ps *failoverPowerSensor) Power(ctx context.Context, extra map[string]any) 
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
 
-	// Poll the last sensor we know is working
+	// Poll the last sensor we know is working.
+	// In the non-error case, the wrapper will never return its readings as nil.
 	watts, err := common.TryReadingOrFail(ctx, ps.timeout, ps.lastWorkingCurrent, powerWrapper, extra)
 	if err == nil {
 		return watts, nil
@@ -194,7 +199,8 @@ func (ps *failoverPowerSensor) Readings(ctx context.Context, extra map[string]an
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
 
-	// Poll the last sensor we know is working
+	// Poll the last sensor we know is working.
+	// In the non-error case, the wrapper will never return its readings as nil.
 	readings, err := common.TryReadingOrFail(ctx, ps.timeout, ps.lastWorkingReadings, common.ReadingsWrapper, extra)
 	if err == nil {
 		return readings, nil
