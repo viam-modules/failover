@@ -5,8 +5,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
+	multierror "github.com/hashicorp/go-multierror"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/utils"
 )
@@ -33,6 +35,61 @@ func (cfg Config) Validate(path string) ([]string, error) {
 	deps = append(deps, cfg.Backups...)
 
 	return deps, nil
+}
+
+type Backups struct {
+	mu                sync.Mutex
+	BackupList        []resource.Sensor
+	LastWorkingSensor resource.Sensor
+	Timeout           int
+	Calls             []func(context.Context, resource.Sensor, map[string]any) (any, error)
+}
+
+func (b *Backups) GetWorkingSensor(ctx context.Context, extra map[string]interface{}, calls ...func(context.Context, resource.Sensor, map[string]any) (any, error)) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	// First call all APIs for the lastworkingsensor, if it works can use the same lastworkingsensor, return
+	err := CallAllFunctions(ctx, b.LastWorkingSensor, b.Timeout, extra, calls)
+	if err == nil {
+		return nil
+	}
+
+	// If the lastWorkingsensor failed, we need to find a replacement, loop through the backups until one of them succeeds for all API calls.
+	for _, backup := range b.BackupList {
+		// Already tried it.
+		if backup == b.LastWorkingSensor {
+			continue
+		}
+		// Loop through all API calls and record the errors
+		err := CallAllFunctions(ctx, backup, b.Timeout, extra, calls)
+		if err != nil {
+			return err
+		}
+		// all calls were successful, replace lastworkingsensor
+		b.LastWorkingSensor = backup
+		break
+	}
+	return nil
+
+}
+
+func CallAllFunctions(ctx context.Context, s resource.Sensor, timeout int, extra map[string]interface{}, calls []func(context.Context, resource.Sensor, map[string]any) (any, error)) error {
+	var errors *multierror.Error
+
+	for _, call := range calls {
+		_, err := TryReadingOrFail(ctx, timeout, s, call, extra)
+		errors = multierror.Append(errors, err)
+	}
+	if errors.ErrorOrNil() == nil {
+		return nil
+	}
+	return errors
+
+}
+
+type primary struct {
+	resource.Sensor
 }
 
 // Go does not allow channels containing a tuple,
@@ -79,7 +136,7 @@ func TryReadingOrFail[K any](ctx context.Context,
 }
 
 // Since all sensors implement readings we can reuse the same wrapper for all models.
-func ReadingsWrapper(ctx context.Context, s resource.Sensor, extra map[string]any) (map[string]any, error) {
+func ReadingsWrapper(ctx context.Context, s resource.Sensor, extra map[string]any) (any, error) {
 	readings, err := s.Readings(ctx, extra)
 	if err != nil {
 		return nil, err

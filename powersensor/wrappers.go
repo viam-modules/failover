@@ -17,7 +17,10 @@ type voltageVals struct {
 	isAc  bool
 }
 
-func voltageWrapper(ctx context.Context, s resource.Sensor, extra map[string]any) (*voltageVals, error) {
+func voltageWrapper(ctx context.Context, s resource.Sensor, extra map[string]any) (any, error) {
+
+	// fmt.Println(fmt.Sprintf("%T", s))
+
 	ps, err := convertToPowerSensor(s)
 	if err != nil {
 		return nil, err
@@ -36,7 +39,7 @@ type currentVals struct {
 	isAc bool
 }
 
-func currentWrapper(ctx context.Context, s resource.Sensor, extra map[string]any) (*currentVals, error) {
+func currentWrapper(ctx context.Context, s resource.Sensor, extra map[string]any) (any, error) {
 	ps, err := convertToPowerSensor(s)
 	if err != nil {
 		return nil, err
@@ -50,7 +53,7 @@ func currentWrapper(ctx context.Context, s resource.Sensor, extra map[string]any
 	return &currentVals{amps: amps, isAc: isAc}, nil
 }
 
-func powerWrapper(ctx context.Context, s resource.Sensor, extra map[string]any) (float64, error) {
+func powerWrapper(ctx context.Context, s resource.Sensor, extra map[string]any) (any, error) {
 	ps, err := convertToPowerSensor(s)
 	if err != nil {
 		return math.NaN(), err

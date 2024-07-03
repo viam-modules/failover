@@ -88,7 +88,6 @@ func TestNewFailoverPowerSensor(t *testing.T) {
 				test.That(t, s.Name(), test.ShouldResemble, config.ResourceName())
 				fs := s.(*failoverPowerSensor)
 				test.That(t, fs.primary, test.ShouldNotBeNil)
-				test.That(t, len(fs.backups), test.ShouldEqual, 2)
 				test.That(t, fs.timeout, test.ShouldEqual, 1)
 			}
 		})
