@@ -3,15 +3,13 @@ package failoversensor
 
 import (
 	"context"
-	"sync"
-	"time"
+	"fmt"
 
 	"failover/common"
 
 	"go.viam.com/rdk/components/sensor"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
-	rdkutils "go.viam.com/rdk/utils"
 )
 
 var (
@@ -36,16 +34,18 @@ func newFailoverSensor(ctx context.Context, deps resource.Dependencies, conf res
 	}
 
 	s := &failoverSensor{
-		Named:   conf.ResourceName().AsNamed(),
-		logger:  logger,
-		workers: rdkutils.NewStoppableWorkers(),
+		Named:  conf.ResourceName().AsNamed(),
+		logger: logger,
 	}
 
 	primary, err := sensor.FromDependencies(deps, config.Primary)
 	if err != nil {
 		return nil, err
 	}
-	s.primary = primary
+
+	s.primary = common.CreatePrimary()
+	s.primary.Logger = logger
+	s.primary.S = primary
 	s.backups = common.Backups{}
 
 	for _, backup := range config.Backups {
@@ -57,18 +57,15 @@ func newFailoverSensor(ctx context.Context, deps resource.Dependencies, conf res
 		}
 	}
 
-	s.lastWorkingSensor = primary
+	s.backups.LastWorkingSensor = s.backups.BackupList[0]
 
 	// default timeout is 1 second.
 	s.timeout = 1000
+	s.primary.Timeout = 1000
+	s.backups.Timeout = 1000
 	if config.Timeout > 0 {
 		s.timeout = config.Timeout
 	}
-
-	// Start goroutine to wait for primary to fail and poll for it to come back online.
-	s.pollPrimaryForHealth()
-	s.pollPrimary = make(chan bool)
-	s.usePrimary = true
 	return s, nil
 }
 
@@ -76,110 +73,42 @@ type failoverSensor struct {
 	resource.AlwaysRebuild
 	resource.Named
 
-	logger  logging.Logger
-	workers rdkutils.StoppableWorkers
+	logger logging.Logger
 
-	primary    sensor.Sensor
-	backups    common.Backups
-	usePrimary bool
-	timeout    int
-
-	mu                sync.Mutex
-	lastWorkingSensor sensor.Sensor
-
-	pollPrimary chan bool
+	primary common.Primary
+	backups common.Backups
+	timeout int
 }
 
 func (s *failoverSensor) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
-	// Poll the last sensor we know is working
-
-	if s.usePrimary {
-		readings, err := common.TryReadingOrFail(ctx, s.timeout, s.primary, common.ReadingsWrapper, extra)
+	if s.primary.UsePrimary {
+		readings, err := common.TryPrimary[map[string]any](ctx, &s.primary, extra, common.ReadingsWrapper)
 		if err == nil {
-			reading := readings.(map[string]interface{})
-			return reading, nil
+			return readings, nil
 		}
-		// upon error of the last working sensor, log the error.
-		s.logger.Warn(err.Error())
-		s.usePrimary = false
-		s.pollPrimary <- true
 	}
+
+	fmt.Println("here")
 
 	err := s.backups.GetWorkingSensor(ctx, extra, common.ReadingsWrapper)
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Println("updated last working")
 	readings, err := common.TryReadingOrFail(ctx, s.timeout, s.backups.LastWorkingSensor, common.ReadingsWrapper, extra)
 	if err != nil {
 		return nil, err
 	}
 
+	fmt.Println("here -2 ")
+
 	reading := readings.(map[string]interface{})
 	return reading, nil
 }
 
-// func (s *failoverSensor) tryBackups(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
-// 	// Lock the mutex to protect lastWorkingSensor from changing before this call finishes.
-// 	s.mu.Lock()
-// 	defer s.mu.Unlock()
-// 	// call Readings from the list of backup sensors until one succeeds.
-// 	for _, backup := range s.backups {
-// 		// if the last working sensor is a backup, it was already tried.
-// 		if s.lastWorkingSensor == backup {
-// 			continue
-// 		}
-// 		s.logger.Infof("calling backup %s", backup.Name())
-// 		reading, err := common.TryReadingOrFail(ctx, s.timeout, backup, common.ReadingsWrapper, extra)
-// 		if err != nil {
-// 			s.logger.Warn(err.Error())
-// 		} else {
-// 			s.logger.Infof("successfully got reading from %s", backup.Name())
-// 			s.lastWorkingSensor = backup
-// 			return reading, nil
-// 		}
-// 	}
-// 	return nil, fmt.Errorf("all sensors failed to get readings")
-// }
-
-// pollPrimaryForHealth starts a background routine that waits for data to come into pollPrimary channel,
-// then continuously polls the primary sensor until it returns a reading, and replaces lastWorkingSensor.
-func (s *failoverSensor) pollPrimaryForHealth() {
-	// poll every 10 ms.
-	ticker := time.NewTicker(time.Millisecond * 10)
-	s.workers.AddWorkers(func(ctx context.Context) {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			// wait for data to come into the channel before polling.
-			case <-s.pollPrimary:
-			}
-			// label for loop so we can break out of it later.
-		L:
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-ticker.C:
-					_, err := common.TryReadingOrFail(ctx, s.timeout, s.primary, common.ReadingsWrapper, nil)
-					if err == nil {
-						s.logger.Infof("successfully got reading from primary sensor")
-						s.mu.Lock()
-						s.lastWorkingSensor = s.primary
-						s.mu.Unlock()
-						break L
-					}
-				}
-			}
-		}
-	})
-}
-
 // Close closes the sensor.
 func (s *failoverSensor) Close(ctx context.Context) error {
-	close(s.pollPrimary)
-	if s.workers != nil {
-		s.workers.Stop()
-	}
+	s.primary.Close()
 	return nil
 }
