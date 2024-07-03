@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"failover/common"
-	"fmt"
 	"runtime"
 	"testing"
 	"time"
@@ -202,8 +201,8 @@ func TestReadings(t *testing.T) {
 	}
 
 	for _, tc := range tests {
+		// Check how many goroutines are running before we create the power sensor to compare at the end.
 		goRoutinesStart := runtime.NumGoroutine()
-		fmt.Println(tc.name)
 		s, err := newFailoverSensor(ctx, deps, tc.config, logger)
 		test.That(t, err, test.ShouldBeNil)
 
@@ -232,6 +231,7 @@ func TestReadings(t *testing.T) {
 		err = s.Close(ctx)
 		test.That(t, err, test.ShouldBeNil)
 		time.Sleep(1 * time.Second)
+		// Check how many routines are still running to ensure there are no leaks from power sensor.
 		goRoutinesEnd := runtime.NumGoroutine()
 		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
 

@@ -1,110 +1,286 @@
-package powersensor
+package failoverpowersensor
 
 import (
 	"context"
 	"errors"
+	"failover/common"
+	"fmt"
+	"math"
+	"sync"
+	"time"
 
 	"go.viam.com/rdk/components/powersensor"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
+	rdkutils "go.viam.com/rdk/utils"
 )
 
 var (
-	Model            = resource.NewModel("viam", "failover", " powersensor")
-	errUnimplemented = errors.New("unimplemented")
+	Model = resource.NewModel("viam", "failover", "powersensor")
 )
 
 func init() {
 	resource.RegisterComponent(powersensor.API, Model,
-		resource.Registration[powersensor.PowerSensor, *Config]{
-			Constructor: newfailoverpowersensor,
+		resource.Registration[powersensor.PowerSensor, common.Config]{
+			Constructor: newFailoverPowerSensor,
 		},
 	)
 }
 
-type Config struct {
-	// Put config attributes here
+type failoverPowerSensor struct {
+	resource.AlwaysRebuild
+	resource.Named
 
-	/* if your model  does not need a config,
-	   replace *Config on line 13 with resource.NoNativeConfig */
+	primary powersensor.PowerSensor
+	backups []powersensor.PowerSensor
 
-	/* Uncomment this if your model does not need to be validated
-	   and has no implicit dependecies. */
-	// resource.TriviallyValidateConfig
+	logger  logging.Logger
+	workers rdkutils.StoppableWorkers
+
+	timeout int
+
+	mu                sync.Mutex
+	lastWorkingSensor powersensor.PowerSensor
+
+	pollPrimaryChan chan bool
+
+	voltageWrapper func(ctx context.Context, s resource.Sensor, extra map[string]any) (*voltageVals, error)
+	currentWrapper func(ctx context.Context, s resource.Sensor, extra map[string]any) (*currentVals, error)
+	powerWrapper   func(ctx context.Context, s resource.Sensor, extra map[string]any) (float64, error)
 }
 
-func (cfg *Config) Validate(path string) ([]string, error) {
-	// Add config validation code here
-	return nil, nil
-}
-
-type failoverpowersensor struct {
-	name resource.Name
-
-	logger logging.Logger
-	cfg    *Config
-
-	cancelCtx  context.Context
-	cancelFunc func()
-
-	/* Uncomment this if your model does not need to reconfigure. */
-	// resource.TriviallyReconfigurable
-
-	// Uncomment this if the model does not have any goroutines that
-	// need to be shut down while closing.
-	// resource.TriviallyCloseable
-}
-
-func newfailoverpowersensor(ctx context.Context, deps resource.Dependencies, rawConf resource.Config, logger logging.Logger) (powersensor.PowerSensor, error) {
-	conf, err := resource.NativeConfig[*Config](rawConf)
+func newFailoverPowerSensor(ctx context.Context, deps resource.Dependencies, conf resource.Config, logger logging.Logger) (powersensor.PowerSensor, error) {
+	config, err := resource.NativeConfig[common.Config](conf)
 	if err != nil {
 		return nil, err
 	}
 
-	cancelCtx, cancelFunc := context.WithCancel(context.Background())
-
-	s := &failoverpowersensor{
-		name:       rawConf.ResourceName(),
-		logger:     logger,
-		cfg:        conf,
-		cancelCtx:  cancelCtx,
-		cancelFunc: cancelFunc,
+	ps := &failoverPowerSensor{
+		Named:   conf.ResourceName().AsNamed(),
+		logger:  logger,
+		workers: rdkutils.NewStoppableWorkers(),
 	}
-	return s, nil
+
+	primary, err := powersensor.FromDependencies(deps, config.Primary)
+	if err != nil {
+		return nil, err
+	}
+	ps.primary = primary
+	ps.backups = []powersensor.PowerSensor{}
+
+	for _, backup := range config.Backups {
+		backup, err := powersensor.FromDependencies(deps, backup)
+		if err != nil {
+			ps.logger.Errorf(err.Error())
+		} else {
+			ps.backups = append(ps.backups, backup)
+		}
+	}
+
+	ps.lastWorkingSensor = primary
+
+	// default timeout is 1 second.
+	ps.timeout = 1000
+	if config.Timeout > 0 {
+		ps.timeout = config.Timeout
+	}
+
+	ps.pollPrimaryChan = make(chan bool)
+
+	ps.voltageWrapper = voltageWrapper
+	ps.currentWrapper = currentWrapper
+	ps.powerWrapper = powerWrapper
+
+	PollPrimaryForHealth(ps)
+
+	return ps, nil
+
 }
 
-func (s *failoverpowersensor) Name() resource.Name {
-	return s.name
-}
+func (ps *failoverPowerSensor) Voltage(ctx context.Context, extra map[string]any) (float64, bool, error) {
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
 
-func (s *failoverpowersensor) Reconfigure(ctx context.Context, deps resource.Dependencies, conf resource.Config) error {
-	// Put reconfigure code here
-	return nil
-}
+	// Poll the last sensor we know is working.
+	// In the non-error case, the wrapper will never return its readings as nil.
+	readings, err := common.TryReadingOrFail(ctx, ps.timeout, ps.lastWorkingSensor, voltageWrapper, extra)
 
-func (s *failoverpowersensor) Voltage(ctx context.Context, extra map[string]interface{}) (float64, bool, error) {
-	return 0, false, nil
+	if err == nil {
+		return readings.volts, readings.isAc, nil
+	}
+
+	// upon error of the last working sensor, log the error.
+	ps.logger.Warnf("powersensor %s failed to get voltage: %s", ps.lastWorkingSensor.Name().ShortName(), err.Error())
+
+	// If the primary failed, tell the goroutine to start checking the health.
+	switch ps.lastWorkingSensor {
+	case ps.primary:
+		ps.pollPrimaryChan <- true
+	default:
+	}
+
+	readings, err = tryBackups(ctx, ps, voltageWrapper, extra)
+	if err != nil {
+		return math.NaN(), false, errors.New("all power sensors failed to get voltage")
+	}
+
+	return readings.volts, readings.isAc, nil
+
 }
 
 // Current returns the current reading in amperes and a bool returning true if the current is AC.
-func (s *failoverpowersensor) Current(ctx context.Context, extra map[string]interface{}) (float64, bool, error) {
-	return 0, false, nil
+func (ps *failoverPowerSensor) Current(ctx context.Context, extra map[string]any) (float64, bool, error) {
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+
+	// Poll the last sensor we know is working.
+	// In the non-error case, the wrapper will never return its readings as nil.
+	currentVals, err := common.TryReadingOrFail(ctx, ps.timeout, ps.lastWorkingSensor, currentWrapper, extra)
+	if err == nil {
+		return currentVals.amps, currentVals.isAc, nil
+	}
+
+	// upon error of the last working sensor, log the error.
+	ps.logger.Warnf("powersensor %s failed to get current: %s", ps.lastWorkingSensor.Name().ShortName(), err.Error())
+
+	// If the primary failed, tell the goroutine to start checking the health.
+	switch ps.lastWorkingSensor {
+	case ps.primary:
+		ps.pollPrimaryChan <- true
+	default:
+	}
+
+	currentVals, err = tryBackups(ctx, ps, currentWrapper, extra)
+	if err != nil {
+		return math.NaN(), false, errors.New("all power sensors failed to get current")
+	}
+	return currentVals.amps, currentVals.isAc, nil
 }
 
 // Power returns the power reading in watts.
-func (s *failoverpowersensor) Power(ctx context.Context, extra map[string]interface{}) (float64, error) {
-	return 0, nil
+func (ps *failoverPowerSensor) Power(ctx context.Context, extra map[string]any) (float64, error) {
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+
+	// Poll the last sensor we know is working.
+	// In the non-error case, the wrapper will never return its readings as nil.
+	watts, err := common.TryReadingOrFail(ctx, ps.timeout, ps.lastWorkingSensor, powerWrapper, extra)
+	if err == nil {
+		return watts, nil
+	}
+	// upon error of the last working sensor, log the error.
+	ps.logger.Warnf("powersensor %s failed to get power: %s", ps.lastWorkingSensor.Name().ShortName(), err.Error())
+
+	// If the primary failed, tell the goroutine to start checking the health.
+	switch ps.lastWorkingSensor {
+	case ps.primary:
+		ps.pollPrimaryChan <- true
+	default:
+	}
+
+	watts, err = tryBackups(ctx, ps, powerWrapper, extra)
+	if err != nil {
+		return math.NaN(), errors.New("all power sensors failed to get power")
+	}
+	return watts, nil
 }
 
-func (s *failoverpowersensor) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
-	return nil, nil
+func (ps *failoverPowerSensor) Readings(ctx context.Context, extra map[string]any) (map[string]any, error) {
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+
+	// Poll the last sensor we know is working.
+	// In the non-error case, the wrapper will never return its readings as nil.
+	readings, err := common.TryReadingOrFail(ctx, ps.timeout, ps.lastWorkingSensor, common.ReadingsWrapper, extra)
+	if err == nil {
+		return readings, nil
+	}
+
+	// upon error of the last working sensor, log the error.
+	ps.logger.Warnf("powersensor %s failed: %s", ps.lastWorkingSensor.Name().ShortName(), err.Error())
+
+	// If the primary failed, tell the goroutine to start checking the health.
+	switch ps.lastWorkingSensor {
+	case ps.primary:
+		ps.pollPrimaryChan <- true
+	default:
+	}
+
+	readings, err = tryBackups(ctx, ps, common.ReadingsWrapper, extra)
+	if err != nil {
+		return nil, errors.New("all power sensors failed to get readings")
+	}
+	return readings, nil
+
 }
 
-func (s *failoverpowersensor) DoCommand(ctx context.Context, cmd map[string]interface{}) (map[string]interface{}, error) {
-	s.logger.Error("DoCommand method unimplemented")
-	return nil, errUnimplemented
+func tryBackups[T any](ctx context.Context,
+	ps *failoverPowerSensor,
+	call func(ctx context.Context, ps resource.Sensor, extra map[string]any) (T, error),
+	extra map[string]any) (
+	T, error) {
+	var zero T
+	for _, backup := range ps.backups {
+		// if the last working sensor is a backup, it was already tried above.
+		if ps.lastWorkingSensor == backup {
+			continue
+		}
+		ps.logger.Infof("calling backup %s", backup.Name())
+		reading, err := common.TryReadingOrFail[T](ctx, ps.timeout, backup, call, extra)
+		if err != nil {
+			ps.logger.Warn(err.Error())
+		} else {
+			ps.logger.Infof("successfully got reading from %s", backup.Name())
+			ps.lastWorkingSensor = backup
+			return reading, nil
+		}
+	}
+	return zero, fmt.Errorf("all power sensors failed")
 }
 
-func (s *failoverpowersensor) Close(context.Context) error {
+// pollPrimaryForHealth starts a background routine that waits for data to come into pollPrimary channel,
+// then continuously polls the primary sensor until it returns a reading, and replaces lastWorkingSensor.
+func PollPrimaryForHealth(s *failoverPowerSensor) {
+	// poll every 10 ms.
+	ticker := time.NewTicker(time.Millisecond * 10)
+	s.workers.AddWorkers(func(ctx context.Context) {
+		for {
+			select {
+			// wait for data to come into the channel before polling.
+			case <-ctx.Done():
+				return
+			case <-s.pollPrimaryChan:
+			}
+			// label for loop so we can break out of it later.
+		L:
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					_, voltageErr := common.TryReadingOrFail(ctx, s.timeout, s.primary, s.voltageWrapper, nil)
+					_, currentErr := common.TryReadingOrFail(ctx, s.timeout, s.primary, s.currentWrapper, nil)
+					_, powerErr := common.TryReadingOrFail(ctx, s.timeout, s.primary, s.powerWrapper, nil)
+
+					// If sensor was able to get all three readings, replace lastWorkingSensor with primary.
+					if powerErr == nil && currentErr == nil && voltageErr == nil {
+						s.logger.Infof("successfully got readings from primary sensor")
+						s.mu.Lock()
+						s.lastWorkingSensor = s.primary
+						s.mu.Unlock()
+						break L
+					}
+				}
+			}
+		}
+	})
+}
+
+func (s *failoverPowerSensor) Close(context.Context) error {
+
+	if s.workers != nil {
+		s.workers.Stop()
+	}
+	close(s.pollPrimaryChan)
 	return nil
 }

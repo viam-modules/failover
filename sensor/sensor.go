@@ -90,10 +90,9 @@ type failoverSensor struct {
 }
 
 func (s *failoverSensor) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
-
 	// Poll the last sensor we know is working
-	readings, err := common.TryReadingOrFail(ctx, s.timeout, s.lastWorkingSensor, s.lastWorkingSensor.Readings, extra)
-	if readings != nil {
+	readings, err := common.TryReadingOrFail(ctx, s.timeout, s.lastWorkingSensor, common.ReadingsWrapper, extra)
+	if err == nil {
 		return readings, nil
 	}
 	// upon error of the last working sensor, log the error.
@@ -124,7 +123,7 @@ func (s *failoverSensor) tryBackups(ctx context.Context, extra map[string]interf
 			continue
 		}
 		s.logger.Infof("calling backup %s", backup.Name())
-		reading, err := common.TryReadingOrFail(ctx, s.timeout, backup, backup.Readings, extra)
+		reading, err := common.TryReadingOrFail(ctx, s.timeout, backup, common.ReadingsWrapper, extra)
 		if err != nil {
 			s.logger.Warn(err.Error())
 		} else {
@@ -156,7 +155,7 @@ func (s *failoverSensor) pollPrimaryForHealth() {
 				case <-ctx.Done():
 					return
 				case <-ticker.C:
-					_, err := common.TryReadingOrFail(ctx, s.timeout, s.primary, s.primary.Readings, nil)
+					_, err := common.TryReadingOrFail(ctx, s.timeout, s.primary, common.ReadingsWrapper, nil)
 					if err == nil {
 						s.logger.Infof("successfully got reading from primary sensor")
 						s.mu.Lock()
