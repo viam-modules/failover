@@ -3,7 +3,6 @@ package failoversensor
 
 import (
 	"context"
-	"fmt"
 
 	"failover/common"
 
@@ -43,29 +42,25 @@ func newFailoverSensor(ctx context.Context, deps resource.Dependencies, conf res
 		return nil, err
 	}
 
-	s.primary = common.CreatePrimary()
-	s.primary.Logger = logger
-	s.primary.S = primary
-	s.backups = common.Backups{}
+	s.timeout = 1000
+	if config.Timeout > 0 {
+		s.timeout = config.Timeout
+	}
+
+	backups := []resource.Sensor{}
 
 	for _, backup := range config.Backups {
 		backup, err := sensor.FromDependencies(deps, backup)
 		if err != nil {
 			s.logger.Errorf(err.Error())
-		} else {
-			s.backups.BackupList = append(s.backups.BackupList, backup)
 		}
+		backups = append(backups, backup)
 	}
 
-	s.backups.LastWorkingSensor = s.backups.BackupList[0]
+	calls := []func(context.Context, resource.Sensor, map[string]any) (any, error){common.ReadingsWrapper}
 
-	// default timeout is 1 second.
-	s.timeout = 1000
-	s.primary.Timeout = 1000
-	s.backups.Timeout = 1000
-	if config.Timeout > 0 {
-		s.timeout = config.Timeout
-	}
+	s.primary = common.CreatePrimary(ctx, s.timeout, logger, primary, calls)
+	s.backups = common.CreateBackup(s.timeout, logger, backups, calls)
 	return s, nil
 }
 
@@ -76,11 +71,13 @@ type failoverSensor struct {
 	logger logging.Logger
 
 	primary common.Primary
-	backups common.Backups
+	backups *common.Backups
 	timeout int
 }
 
 func (s *failoverSensor) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
+
+	// If UsePrimary flag is set, call readings on primary sensor and return if no error.
 	if s.primary.UsePrimary {
 		readings, err := common.TryPrimary[map[string]any](ctx, &s.primary, extra, common.ReadingsWrapper)
 		if err == nil {
@@ -88,20 +85,17 @@ func (s *failoverSensor) Readings(ctx context.Context, extra map[string]interfac
 		}
 	}
 
-	fmt.Println("here")
-
-	err := s.backups.GetWorkingSensor(ctx, extra, common.ReadingsWrapper)
+	// if primary failed, update the backups lastworkingsensor
+	err := s.backups.GetWorkingSensor(ctx, extra)
 	if err != nil {
 		return nil, err
 	}
 
-	fmt.Println("updated last working")
+	// Call readings on the lastworkingsensor
 	readings, err := common.TryReadingOrFail(ctx, s.timeout, s.backups.LastWorkingSensor, common.ReadingsWrapper, extra)
 	if err != nil {
 		return nil, err
 	}
-
-	fmt.Println("here -2 ")
 
 	reading := readings.(map[string]interface{})
 	return reading, nil

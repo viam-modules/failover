@@ -18,9 +18,6 @@ type voltageVals struct {
 }
 
 func voltageWrapper(ctx context.Context, s resource.Sensor, extra map[string]any) (any, error) {
-
-	// fmt.Println(fmt.Sprintf("%T", s))
-
 	ps, err := convertToPowerSensor(s)
 	if err != nil {
 		return nil, err
