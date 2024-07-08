@@ -3,6 +3,7 @@ package failoversensor
 
 import (
 	"context"
+	"fmt"
 
 	"failover/common"
 
@@ -88,13 +89,13 @@ func (s *failoverSensor) Readings(ctx context.Context, extra map[string]interfac
 	// if primary failed, update the backups lastworkingsensor
 	err := s.backups.GetWorkingSensor(ctx, extra)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("all sensors failed to get readings: %w", err)
 	}
 
 	// Call readings on the lastworkingsensor
 	readings, err := common.TryReadingOrFail(ctx, s.timeout, s.backups.LastWorkingSensor, common.ReadingsWrapper, extra)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("all sensors failed to get readings: %w", err)
 	}
 
 	reading := readings.(map[string]interface{})

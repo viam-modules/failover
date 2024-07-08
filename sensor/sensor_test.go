@@ -202,8 +202,6 @@ func TestReadings(t *testing.T) {
 	for _, tc := range tests {
 		// Check how many goroutines are running before we create the power sensor to compare at the end.
 		goRoutinesStart := runtime.NumGoroutine()
-		s, err := newFailoverSensor(ctx, deps, tc.config, logger)
-		test.That(t, err, test.ShouldBeNil)
 
 		sensors.primary.ReadingsFunc = func(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
 			time.Sleep(time.Duration(tc.primaryTimeSeconds) * time.Second)
@@ -216,6 +214,9 @@ func TestReadings(t *testing.T) {
 		sensors.backup2.ReadingsFunc = func(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
 			return tc.backup2Reading, tc.backup2Err
 		}
+
+		s, err := newFailoverSensor(ctx, deps, tc.config, logger)
+		test.That(t, err, test.ShouldBeNil)
 
 		reading, err := s.Readings(ctx, nil)
 

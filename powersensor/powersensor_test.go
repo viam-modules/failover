@@ -53,6 +53,51 @@ func setup(t *testing.T) (testPowerSensors, resource.Dependencies) {
 	deps[powersensor.Named(backup1Name)] = powerSensors.backup1
 	deps[powersensor.Named(backup2Name)] = powerSensors.backup2
 
+	// Define defaults for the inject functions, these will be overriden in the tests.
+	powerSensors.primary.VoltageFunc = func(ctx context.Context, extra map[string]any) (float64, bool, error) {
+		return 1, false, nil
+	}
+
+	powerSensors.backup1.VoltageFunc = func(ctx context.Context, extra map[string]any) (float64, bool, error) {
+		return 1, false, nil
+	}
+	powerSensors.backup2.VoltageFunc = func(ctx context.Context, extra map[string]any) (float64, bool, error) {
+		return 1, false, nil
+	}
+
+	powerSensors.primary.CurrentFunc = func(ctx context.Context, extra map[string]any) (float64, bool, error) {
+		return 1, false, nil
+	}
+
+	powerSensors.backup1.CurrentFunc = func(ctx context.Context, extra map[string]any) (float64, bool, error) {
+		return 1, false, nil
+	}
+	powerSensors.backup2.CurrentFunc = func(ctx context.Context, extra map[string]any) (float64, bool, error) {
+		return 1, false, nil
+	}
+
+	powerSensors.primary.PowerFunc = func(ctx context.Context, extra map[string]any) (float64, error) {
+		return 1, nil
+	}
+
+	powerSensors.backup1.PowerFunc = func(ctx context.Context, extra map[string]any) (float64, error) {
+		return 1, nil
+	}
+	powerSensors.backup2.PowerFunc = func(ctx context.Context, extra map[string]any) (float64, error) {
+		return 1, nil
+	}
+
+	powerSensors.primary.ReadingsFunc = func(ctx context.Context, extra map[string]any) (map[string]any, error) {
+		return map[string]any{"foo": 1}, nil
+	}
+
+	powerSensors.backup1.ReadingsFunc = func(ctx context.Context, extra map[string]any) (map[string]any, error) {
+		return map[string]any{"foo": 1}, nil
+	}
+	powerSensors.backup2.ReadingsFunc = func(ctx context.Context, extra map[string]any) (map[string]any, error) {
+		return map[string]any{"foo": 1}, nil
+	}
+
 	return powerSensors, deps
 }
 
