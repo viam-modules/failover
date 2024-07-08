@@ -2,6 +2,7 @@ package failoverpowersensor
 
 import (
 	"context"
+	"errors"
 	"failover/common"
 	"fmt"
 	"math"
@@ -82,7 +83,7 @@ func (ps *failoverPowerSensor) Voltage(ctx context.Context, extra map[string]any
 	defer ps.mu.Unlock()
 
 	// if UsePrimary flag is set, call voltage on the primary
-	if ps.primary.UsePrimary {
+	if ps.primary.UsePrimary() {
 		readings, err := common.TryPrimary[*voltageVals](ctx, ps.primary, extra, voltageWrapper)
 		if err == nil {
 			return readings.volts, readings.isAc, nil
@@ -90,19 +91,22 @@ func (ps *failoverPowerSensor) Voltage(ctx context.Context, extra map[string]any
 	}
 
 	// Primary failed, find a working sensor
-	err := ps.backups.GetWorkingSensor(ctx, extra)
+	workingSensor, err := ps.backups.GetWorkingSensor(ctx, extra)
 	if err != nil {
 		return math.NaN(), false, fmt.Errorf("all power sensors failed to get voltage: %w", err)
 	}
 
 	// Read from the backups last working sensor.
 	// In the non-error case, the wrapper will never return its readings as nil.
-	readings, err := common.TryReadingOrFail(ctx, ps.timeout, ps.backups.LastWorkingSensor, voltageWrapper, extra)
+	readings, err := common.TryReadingOrFail(ctx, ps.timeout, workingSensor, voltageWrapper, extra)
 	if err != nil {
 		return math.NaN(), false, fmt.Errorf("all power sensors failed to get voltage: %w", err)
 	}
 
-	vals := readings.(*voltageVals)
+	vals, ok := readings.(*voltageVals)
+	if !ok {
+		return math.NaN(), false, errors.New("failed to get voltage: type assertion failed")
+	}
 	return vals.volts, vals.isAc, nil
 
 }
@@ -112,7 +116,7 @@ func (ps *failoverPowerSensor) Current(ctx context.Context, extra map[string]any
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
 
-	if ps.primary.UsePrimary {
+	if ps.primary.UsePrimary() {
 		readings, err := common.TryPrimary[*currentVals](ctx, ps.primary, extra, currentWrapper)
 		if err == nil {
 			return readings.amps, readings.isAc, nil
@@ -121,19 +125,22 @@ func (ps *failoverPowerSensor) Current(ctx context.Context, extra map[string]any
 	}
 
 	// Primary failed, find a working sensor
-	err := ps.backups.GetWorkingSensor(ctx, extra)
+	workingSensor, err := ps.backups.GetWorkingSensor(ctx, extra)
 	if err != nil {
 		return math.NaN(), false, fmt.Errorf("all power sensors failed to get current: %w", err)
 	}
 
 	// Read from the backups last working sensor.
 	// In the non-error case, the wrapper will never return its readings as nil.
-	readings, err := common.TryReadingOrFail(ctx, ps.timeout, ps.backups.LastWorkingSensor, currentWrapper, extra)
+	readings, err := common.TryReadingOrFail(ctx, ps.timeout, workingSensor, currentWrapper, extra)
 	if err != nil {
 		return math.NaN(), false, fmt.Errorf("all power sensors failed to get current: %w", err)
 	}
 
-	currentVals := readings.(*currentVals)
+	currentVals, ok := readings.(*currentVals)
+	if !ok {
+		return math.NaN(), false, errors.New("failed to get current: type assertion failed")
+	}
 	return currentVals.amps, currentVals.isAc, nil
 }
 
@@ -142,7 +149,7 @@ func (ps *failoverPowerSensor) Power(ctx context.Context, extra map[string]any) 
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
 
-	if ps.primary.UsePrimary {
+	if ps.primary.UsePrimary() {
 		// Poll the last sensor we know is working.
 		// In the non-error case, the wrapper will never return its readings as nil.
 		readings, err := common.TryPrimary[float64](ctx, ps.primary, extra, powerWrapper)
@@ -152,18 +159,21 @@ func (ps *failoverPowerSensor) Power(ctx context.Context, extra map[string]any) 
 	}
 
 	// Primary failed, find a working sensor
-	err := ps.backups.GetWorkingSensor(ctx, extra)
+	workingSensor, err := ps.backups.GetWorkingSensor(ctx, extra)
 	if err != nil {
 		return math.NaN(), fmt.Errorf("all power sensors failed to get power: %w", err)
 	}
 
 	// Read from the backups last working sensor.
 	// In the non-error case, the wrapper will never return its readings as nil.
-	readings, err := common.TryReadingOrFail(ctx, ps.timeout, ps.backups.LastWorkingSensor, powerWrapper, extra)
+	readings, err := common.TryReadingOrFail(ctx, ps.timeout, workingSensor, powerWrapper, extra)
 	if err != nil {
 		return math.NaN(), fmt.Errorf("all power sensors failed to get power: %w", err)
 	}
-	watts := readings.(float64)
+	watts, ok := readings.(float64)
+	if !ok {
+		return math.NaN(), errors.New("failed to get power: type assertion failed")
+	}
 	return watts, nil
 }
 
@@ -171,7 +181,7 @@ func (ps *failoverPowerSensor) Readings(ctx context.Context, extra map[string]an
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
 
-	if ps.primary.UsePrimary {
+	if ps.primary.UsePrimary() {
 		readings, err := common.TryPrimary[map[string]any](ctx, ps.primary, extra, common.ReadingsWrapper)
 		if err == nil {
 			return readings, nil
@@ -179,19 +189,22 @@ func (ps *failoverPowerSensor) Readings(ctx context.Context, extra map[string]an
 	}
 
 	// Primary failed, find a working sensor
-	err := ps.backups.GetWorkingSensor(ctx, extra)
+	workingSensor, err := ps.backups.GetWorkingSensor(ctx, extra)
 	if err != nil {
 		return nil, fmt.Errorf("all power sensors failed to get readings: %w", err)
 	}
 
 	// Read from the backups last working sensor.
 	// In the non-error case, the wrapper will never return its readings as nil.
-	readings, err := common.TryReadingOrFail(ctx, ps.timeout, ps.backups.LastWorkingSensor, common.ReadingsWrapper, extra)
+	readings, err := common.TryReadingOrFail(ctx, ps.timeout, workingSensor, common.ReadingsWrapper, extra)
 	if err != nil {
 		return nil, fmt.Errorf("all power sensors failed to get readings: %w", err)
 	}
 
-	reading := readings.(map[string]interface{})
+	reading, ok := readings.(map[string]interface{})
+	if !ok {
+		return nil, errors.New("failed to get readings: type assertion failed")
+	}
 	return reading, nil
 
 }

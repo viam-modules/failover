@@ -3,6 +3,7 @@ package failoversensor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"failover/common"
@@ -79,7 +80,7 @@ type failoverSensor struct {
 func (s *failoverSensor) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
 
 	// If UsePrimary flag is set, call readings on primary sensor and return if no error.
-	if s.primary.UsePrimary {
+	if s.primary.UsePrimary() {
 		readings, err := common.TryPrimary[map[string]any](ctx, s.primary, extra, common.ReadingsWrapper)
 		if err == nil {
 			return readings, nil
@@ -87,18 +88,21 @@ func (s *failoverSensor) Readings(ctx context.Context, extra map[string]interfac
 	}
 
 	// if primary failed, update the backups lastworkingsensor
-	err := s.backups.GetWorkingSensor(ctx, extra)
+	workingSensor, err := s.backups.GetWorkingSensor(ctx, extra)
 	if err != nil {
 		return nil, fmt.Errorf("all sensors failed to get readings: %w", err)
 	}
 
 	// Call readings on the lastworkingsensor
-	readings, err := common.TryReadingOrFail(ctx, s.timeout, s.backups.LastWorkingSensor, common.ReadingsWrapper, extra)
+	readings, err := common.TryReadingOrFail(ctx, s.timeout, workingSensor, common.ReadingsWrapper, extra)
 	if err != nil {
 		return nil, fmt.Errorf("all sensors failed to get readings: %w", err)
 	}
 
-	reading := readings.(map[string]interface{})
+	reading, ok := readings.(map[string]interface{})
+	if !ok {
+		return nil, errors.New("failed to get readings: type assertion failed")
+	}
 	return reading, nil
 }
 
