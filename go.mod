@@ -4,8 +4,8 @@ go 1.21.10
 
 require (
 	github.com/golang/geo v0.0.0-20230421003525-6adc56603217
+	github.com/hashicorp/go-multierror v1.1.1
 	github.com/kellydunn/golang-geo v0.7.0
-	go.uber.org/goleak v1.3.0
 	go.viam.com/rdk v0.29.0
 	go.viam.com/test v1.1.1-0.20220913152726-5da9916c08a2
 	go.viam.com/utils v0.1.80
@@ -73,6 +73,7 @@ require (
 	github.com/gorilla/securecookie v1.1.1 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.15.2 // indirect
+	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/improbable-eng/grpc-web v0.15.0 // indirect
 	github.com/jedib0t/go-pretty/v6 v6.4.6 // indirect
 	github.com/jhump/protoreflect v1.15.1 // indirect
@@ -133,6 +134,7 @@ require (
 	go.mongodb.org/mongo-driver v1.11.6 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
+	go.uber.org/goleak v1.3.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
 	go.viam.com/api v0.1.311 // indirect

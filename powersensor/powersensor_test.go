@@ -53,6 +53,51 @@ func setup(t *testing.T) (testPowerSensors, resource.Dependencies) {
 	deps[powersensor.Named(backup1Name)] = powerSensors.backup1
 	deps[powersensor.Named(backup2Name)] = powerSensors.backup2
 
+	// Define defaults for the inject functions, these will be overriden in the tests.
+	powerSensors.primary.VoltageFunc = func(ctx context.Context, extra map[string]any) (float64, bool, error) {
+		return 1, false, nil
+	}
+
+	powerSensors.backup1.VoltageFunc = func(ctx context.Context, extra map[string]any) (float64, bool, error) {
+		return 1, false, nil
+	}
+	powerSensors.backup2.VoltageFunc = func(ctx context.Context, extra map[string]any) (float64, bool, error) {
+		return 1, false, nil
+	}
+
+	powerSensors.primary.CurrentFunc = func(ctx context.Context, extra map[string]any) (float64, bool, error) {
+		return 1, false, nil
+	}
+
+	powerSensors.backup1.CurrentFunc = func(ctx context.Context, extra map[string]any) (float64, bool, error) {
+		return 1, false, nil
+	}
+	powerSensors.backup2.CurrentFunc = func(ctx context.Context, extra map[string]any) (float64, bool, error) {
+		return 1, false, nil
+	}
+
+	powerSensors.primary.PowerFunc = func(ctx context.Context, extra map[string]any) (float64, error) {
+		return 1, nil
+	}
+
+	powerSensors.backup1.PowerFunc = func(ctx context.Context, extra map[string]any) (float64, error) {
+		return 1, nil
+	}
+	powerSensors.backup2.PowerFunc = func(ctx context.Context, extra map[string]any) (float64, error) {
+		return 1, nil
+	}
+
+	powerSensors.primary.ReadingsFunc = func(ctx context.Context, extra map[string]any) (map[string]any, error) {
+		return map[string]any{"foo": 1}, nil
+	}
+
+	powerSensors.backup1.ReadingsFunc = func(ctx context.Context, extra map[string]any) (map[string]any, error) {
+		return map[string]any{"foo": 1}, nil
+	}
+	powerSensors.backup2.ReadingsFunc = func(ctx context.Context, extra map[string]any) (map[string]any, error) {
+		return map[string]any{"foo": 1}, nil
+	}
+
 	return powerSensors, deps
 }
 
@@ -88,7 +133,6 @@ func TestNewFailoverPowerSensor(t *testing.T) {
 				test.That(t, s.Name(), test.ShouldResemble, config.ResourceName())
 				fs := s.(*failoverPowerSensor)
 				test.That(t, fs.primary, test.ShouldNotBeNil)
-				test.That(t, len(fs.backups), test.ShouldEqual, 2)
 				test.That(t, fs.timeout, test.ShouldEqual, 1)
 			}
 		})
@@ -159,8 +203,6 @@ func TestPower(t *testing.T) {
 	for _, tc := range tests {
 
 		goRoutinesStart := runtime.NumGoroutine()
-		s, err := newFailoverPowerSensor(ctx, deps, config, logger)
-		test.That(t, err, test.ShouldBeNil)
 
 		sensors.primary.PowerFunc = func(ctx context.Context, extra map[string]any) (float64, error) {
 			time.Sleep(time.Duration(tc.primaryTimeSeconds) * time.Second)
@@ -173,6 +215,9 @@ func TestPower(t *testing.T) {
 		sensors.backup2.PowerFunc = func(ctx context.Context, extra map[string]any) (float64, error) {
 			return tc.backup2Power, tc.backup2Err
 		}
+
+		s, err := newFailoverPowerSensor(ctx, deps, config, logger)
+		test.That(t, err, test.ShouldBeNil)
 
 		watts, err := s.Power(ctx, nil)
 
@@ -258,8 +303,6 @@ func TestCurrent(t *testing.T) {
 	for _, tc := range tests {
 		// Check how many goroutines are running before we create the power sensor to compare at the end.
 		goRoutinesStart := runtime.NumGoroutine()
-		s, err := newFailoverPowerSensor(ctx, deps, config, logger)
-		test.That(t, err, test.ShouldBeNil)
 
 		sensors.primary.CurrentFunc = func(ctx context.Context, extra map[string]any) (float64, bool, error) {
 			time.Sleep(time.Duration(tc.primaryTimeSeconds) * time.Second)
@@ -272,7 +315,8 @@ func TestCurrent(t *testing.T) {
 		sensors.backup2.CurrentFunc = func(ctx context.Context, extra map[string]any) (float64, bool, error) {
 			return tc.backup2Current, false, tc.backup2Err
 		}
-
+		s, err := newFailoverPowerSensor(ctx, deps, config, logger)
+		test.That(t, err, test.ShouldBeNil)
 		amps, ac, err := s.Current(ctx, nil)
 
 		if tc.expectErr {
@@ -358,8 +402,6 @@ func TestVoltage(t *testing.T) {
 	for _, tc := range tests {
 		// Check how many goroutines are running before we create the power sensor to compare at the end.
 		goRoutinesStart := runtime.NumGoroutine()
-		s, err := newFailoverPowerSensor(ctx, deps, config, logger)
-		test.That(t, err, test.ShouldBeNil)
 
 		sensors.primary.VoltageFunc = func(ctx context.Context, extra map[string]any) (float64, bool, error) {
 			time.Sleep(time.Duration(tc.primaryTimeSeconds) * time.Second)
@@ -372,6 +414,9 @@ func TestVoltage(t *testing.T) {
 		sensors.backup2.VoltageFunc = func(ctx context.Context, extra map[string]any) (float64, bool, error) {
 			return tc.backup2Voltage, false, tc.backup2Err
 		}
+
+		s, err := newFailoverPowerSensor(ctx, deps, config, logger)
+		test.That(t, err, test.ShouldBeNil)
 
 		volts, ac, err := s.Voltage(ctx, nil)
 
@@ -455,9 +500,6 @@ func TestReadings(t *testing.T) {
 		// Check how many goroutines are running before we create the power sensor to compare at the end.
 		goRoutinesStart := runtime.NumGoroutine()
 
-		s, err := newFailoverPowerSensor(ctx, deps, config, logger)
-		test.That(t, err, test.ShouldBeNil)
-
 		sensors.primary.ReadingsFunc = func(ctx context.Context, extra map[string]any) (map[string]any, error) {
 			time.Sleep(time.Duration(tc.primaryTimeSeconds) * time.Second)
 			return tc.primaryReading, tc.primaryErr
@@ -469,6 +511,9 @@ func TestReadings(t *testing.T) {
 		sensors.backup2.ReadingsFunc = func(ctx context.Context, extra map[string]any) (map[string]any, error) {
 			return tc.backup2Reading, tc.backup2Err
 		}
+
+		s, err := newFailoverPowerSensor(ctx, deps, config, logger)
+		test.That(t, err, test.ShouldBeNil)
 
 		reading, err := s.Readings(ctx, nil)
 
