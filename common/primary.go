@@ -12,14 +12,16 @@ import (
 
 // Primary defines the primary sensor for the failover.
 type Primary struct {
-	mu              sync.Mutex
 	workers         rdkutils.StoppableWorkers
 	logger          logging.Logger
 	primarySensor   resource.Sensor
 	pollPrimaryChan chan bool
 	timeout         int
-	usePrimary      bool
-	calls           []func(context.Context, resource.Sensor, map[string]any) (any, error)
+
+	mu         sync.Mutex
+	usePrimary bool
+
+	calls []func(context.Context, resource.Sensor, map[string]any) (any, error)
 }
 
 func CreatePrimary(ctx context.Context, timeout int, logger logging.Logger, primarySensor resource.Sensor, calls []func(context.Context, resource.Sensor, map[string]any) (any, error)) *Primary {
@@ -36,7 +38,7 @@ func CreatePrimary(ctx context.Context, timeout int, logger logging.Logger, prim
 	// Start goroutine to check health of the primary sensor
 	primary.PollPrimaryForHealth()
 
-	// TryAllReadings to determine the health of the primary sensor.
+	// TryAllReadings to determine the health of the primary sensor and set the usePrimary flag accordingly.
 	primary.TryAllReadings(ctx)
 
 	return primary

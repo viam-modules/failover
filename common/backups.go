@@ -10,10 +10,11 @@ import (
 
 type Backups struct {
 	BackupList        []resource.Sensor
-	lastWorkingSensor resource.Sensor
-	timeout           int
-	calls             []func(context.Context, resource.Sensor, map[string]any) (any, error)
 	mu                sync.Mutex
+	lastWorkingSensor resource.Sensor
+
+	timeout int
+	calls   []func(context.Context, resource.Sensor, map[string]any) (any, error)
 }
 
 func CreateBackup(timeout int, backupList []resource.Sensor, calls []func(context.Context, resource.Sensor, map[string]any) (any, error)) *Backups {

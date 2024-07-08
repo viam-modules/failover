@@ -30,12 +30,11 @@ type failoverPowerSensor struct {
 	resource.Named
 	logger logging.Logger
 
+	mu      sync.Mutex
 	primary *common.Primary
 	backups *common.Backups
 
 	timeout int
-
-	mu sync.Mutex
 }
 
 func newFailoverPowerSensor(ctx context.Context, deps resource.Dependencies, conf resource.Config, logger logging.Logger) (powersensor.PowerSensor, error) {
