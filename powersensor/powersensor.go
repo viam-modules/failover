@@ -29,7 +29,7 @@ type failoverPowerSensor struct {
 	resource.Named
 	logger logging.Logger
 
-	primary common.Primary
+	primary *common.Primary
 	backups *common.Backups
 
 	timeout int
@@ -83,7 +83,7 @@ func (ps *failoverPowerSensor) Voltage(ctx context.Context, extra map[string]any
 
 	// if UsePrimary flag is set, call voltage on the primary
 	if ps.primary.UsePrimary {
-		readings, err := common.TryPrimary[*voltageVals](ctx, &ps.primary, extra, voltageWrapper)
+		readings, err := common.TryPrimary[*voltageVals](ctx, ps.primary, extra, voltageWrapper)
 		if err == nil {
 			return readings.volts, readings.isAc, nil
 		}
@@ -113,7 +113,7 @@ func (ps *failoverPowerSensor) Current(ctx context.Context, extra map[string]any
 	defer ps.mu.Unlock()
 
 	if ps.primary.UsePrimary {
-		readings, err := common.TryPrimary[*currentVals](ctx, &ps.primary, extra, currentWrapper)
+		readings, err := common.TryPrimary[*currentVals](ctx, ps.primary, extra, currentWrapper)
 		if err == nil {
 			return readings.amps, readings.isAc, nil
 		}
@@ -145,7 +145,7 @@ func (ps *failoverPowerSensor) Power(ctx context.Context, extra map[string]any) 
 	if ps.primary.UsePrimary {
 		// Poll the last sensor we know is working.
 		// In the non-error case, the wrapper will never return its readings as nil.
-		readings, err := common.TryPrimary[float64](ctx, &ps.primary, extra, powerWrapper)
+		readings, err := common.TryPrimary[float64](ctx, ps.primary, extra, powerWrapper)
 		if err == nil {
 			return readings, nil
 		}
@@ -172,7 +172,7 @@ func (ps *failoverPowerSensor) Readings(ctx context.Context, extra map[string]an
 	defer ps.mu.Unlock()
 
 	if ps.primary.UsePrimary {
-		readings, err := common.TryPrimary[map[string]any](ctx, &ps.primary, extra, common.ReadingsWrapper)
+		readings, err := common.TryPrimary[map[string]any](ctx, ps.primary, extra, common.ReadingsWrapper)
 		if err == nil {
 			return readings, nil
 		}

@@ -71,7 +71,7 @@ type failoverSensor struct {
 
 	logger logging.Logger
 
-	primary common.Primary
+	primary *common.Primary
 	backups *common.Backups
 	timeout int
 }
@@ -80,7 +80,7 @@ func (s *failoverSensor) Readings(ctx context.Context, extra map[string]interfac
 
 	// If UsePrimary flag is set, call readings on primary sensor and return if no error.
 	if s.primary.UsePrimary {
-		readings, err := common.TryPrimary[map[string]any](ctx, &s.primary, extra, common.ReadingsWrapper)
+		readings, err := common.TryPrimary[map[string]any](ctx, s.primary, extra, common.ReadingsWrapper)
 		if err == nil {
 			return readings, nil
 		}
