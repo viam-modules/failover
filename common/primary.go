@@ -89,6 +89,7 @@ func (p *Primary) PollPrimaryForHealth() {
 					return
 				case <-ticker.C:
 					err := CallAllFunctions(ctx, p.primarySensor, p.timeout, nil, p.calls)
+					// Primary succeeded, set flag to true
 					if err == nil {
 						p.UsePrimary = true
 						break L

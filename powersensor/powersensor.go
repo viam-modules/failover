@@ -2,8 +2,8 @@ package failoverpowersensor
 
 import (
 	"context"
-	"errors"
 	"failover/common"
+	"fmt"
 	"math"
 	"sync"
 
@@ -71,7 +71,7 @@ func newFailoverPowerSensor(ctx context.Context, deps resource.Dependencies, con
 
 	calls := []func(context.Context, resource.Sensor, map[string]any) (any, error){voltageWrapper, currentWrapper, powerWrapper, common.ReadingsWrapper}
 	ps.primary = common.CreatePrimary(ctx, ps.timeout, logger, primary, calls)
-	ps.backups = common.CreateBackup(ps.timeout, logger, backups, calls)
+	ps.backups = common.CreateBackup(ps.timeout, backups, calls)
 
 	return ps, nil
 
@@ -92,14 +92,14 @@ func (ps *failoverPowerSensor) Voltage(ctx context.Context, extra map[string]any
 	// Primary failed, find a working sensor
 	err := ps.backups.GetWorkingSensor(ctx, extra)
 	if err != nil {
-		return math.NaN(), false, errors.New("all power sensors failed to get voltage")
+		return math.NaN(), false, fmt.Errorf("all power sensors failed to get voltage: %w", err)
 	}
 
 	// Read from the backups last working sensor.
 	// In the non-error case, the wrapper will never return its readings as nil.
 	readings, err := common.TryReadingOrFail(ctx, ps.timeout, ps.backups.LastWorkingSensor, voltageWrapper, extra)
 	if err != nil {
-		return math.NaN(), false, err
+		return math.NaN(), false, fmt.Errorf("all power sensors failed to get voltage: %w", err)
 	}
 
 	vals := readings.(*voltageVals)
@@ -120,16 +120,17 @@ func (ps *failoverPowerSensor) Current(ctx context.Context, extra map[string]any
 
 	}
 
+	// Primary failed, find a working sensor
 	err := ps.backups.GetWorkingSensor(ctx, extra)
 	if err != nil {
-		return math.NaN(), false, errors.New("all power sensors failed to get current")
+		return math.NaN(), false, fmt.Errorf("all power sensors failed to get current: %w", err)
 	}
 
 	// Read from the backups last working sensor.
 	// In the non-error case, the wrapper will never return its readings as nil.
 	readings, err := common.TryReadingOrFail(ctx, ps.timeout, ps.backups.LastWorkingSensor, currentWrapper, extra)
 	if err != nil {
-		return math.NaN(), false, err
+		return math.NaN(), false, fmt.Errorf("all power sensors failed to get current: %w", err)
 	}
 
 	currentVals := readings.(*currentVals)
@@ -150,16 +151,17 @@ func (ps *failoverPowerSensor) Power(ctx context.Context, extra map[string]any) 
 		}
 	}
 
+	// Primary failed, find a working sensor
 	err := ps.backups.GetWorkingSensor(ctx, extra)
 	if err != nil {
-		return math.NaN(), errors.New("all power sensors failed to get power")
+		return math.NaN(), fmt.Errorf("all power sensors failed to get power: %w", err)
 	}
 
 	// Read from the backups last working sensor.
 	// In the non-error case, the wrapper will never return its readings as nil.
 	readings, err := common.TryReadingOrFail(ctx, ps.timeout, ps.backups.LastWorkingSensor, powerWrapper, extra)
 	if err != nil {
-		return math.NaN(), err
+		return math.NaN(), fmt.Errorf("all power sensors failed to get power: %w", err)
 	}
 	watts := readings.(float64)
 	return watts, nil
@@ -176,13 +178,17 @@ func (ps *failoverPowerSensor) Readings(ctx context.Context, extra map[string]an
 		}
 	}
 
+	// Primary failed, find a working sensor
 	err := ps.backups.GetWorkingSensor(ctx, extra)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("all power sensors failed to get readings: %w", err)
 	}
+
+	// Read from the backups last working sensor.
+	// In the non-error case, the wrapper will never return its readings as nil.
 	readings, err := common.TryReadingOrFail(ctx, ps.timeout, ps.backups.LastWorkingSensor, common.ReadingsWrapper, extra)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("all power sensors failed to get readings: %w", err)
 	}
 
 	reading := readings.(map[string]interface{})

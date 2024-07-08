@@ -60,7 +60,7 @@ func newFailoverSensor(ctx context.Context, deps resource.Dependencies, conf res
 	calls := []func(context.Context, resource.Sensor, map[string]any) (any, error){common.ReadingsWrapper}
 
 	s.primary = common.CreatePrimary(ctx, s.timeout, logger, primary, calls)
-	s.backups = common.CreateBackup(s.timeout, logger, backups, calls)
+	s.backups = common.CreateBackup(s.timeout, backups, calls)
 	return s, nil
 }
 
