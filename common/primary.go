@@ -43,11 +43,14 @@ func CreatePrimary(ctx context.Context, timeout int, logger logging.Logger, prim
 }
 
 // Check that all functions on primary are working, if not tell the goroutine to start polling for health and don't use the primary.
-func (primary *Primary) TryAllReadings(ctx context.Context) {
-	err := CallAllFunctions(ctx, primary.primarySensor, primary.timeout, nil, primary.calls)
+func (p *Primary) TryAllReadings(ctx context.Context) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	err := CallAllFunctions(ctx, p.primarySensor, p.timeout, nil, p.calls)
 	if err != nil {
-		primary.UsePrimary = false
-		primary.pollPrimaryChan <- true
+		p.logger.Warnf("primary sensor failed: %s", err.Error())
+		p.UsePrimary = false
+		p.pollPrimaryChan <- true
 	}
 }
 

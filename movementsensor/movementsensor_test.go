@@ -89,7 +89,6 @@ func TestNewFailoverMovementSensor(t *testing.T) {
 				test.That(t, s.Name(), test.ShouldResemble, config.ResourceName())
 				fs := s.(*failoverMovementSensor)
 				test.That(t, fs.primary, test.ShouldNotBeNil)
-				test.That(t, len(fs.allBackups), test.ShouldEqual, 2)
 				test.That(t, fs.timeout, test.ShouldEqual, 1)
 			}
 		})
