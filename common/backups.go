@@ -2,14 +2,14 @@ package common
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"sync"
 
 	"go.viam.com/rdk/resource"
 )
 
 type Backups struct {
-	BackupList        []resource.Sensor
+	backupList        []resource.Sensor
 	mu                sync.Mutex
 	lastWorkingSensor resource.Sensor
 
@@ -19,7 +19,7 @@ type Backups struct {
 
 func CreateBackup(timeout int, backupList []resource.Sensor, calls []func(context.Context, resource.Sensor, map[string]any) (any, error)) *Backups {
 	backups := &Backups{
-		BackupList:        backupList,
+		backupList:        backupList,
 		timeout:           timeout,
 		lastWorkingSensor: backupList[0],
 		calls:             calls,
@@ -38,7 +38,7 @@ func (b *Backups) GetWorkingSensor(ctx context.Context, extra map[string]interfa
 	}
 
 	// If the lastWorkingsensor failed, we need to find a replacement, loop through the backups until one of them succeeds for all API calls.
-	for _, backup := range b.BackupList {
+	for _, backup := range b.backupList {
 		// Already tried it.
 		if backup == lastWorking {
 			continue
@@ -53,7 +53,7 @@ func (b *Backups) GetWorkingSensor(ctx context.Context, extra map[string]interfa
 
 		return backup, nil
 	}
-	return nil, errors.New("all sensors failed")
+	return nil, fmt.Errorf("all %d backup sensors failed", len(b.backupList))
 
 }
 
