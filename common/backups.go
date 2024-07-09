@@ -53,7 +53,13 @@ func (b *Backups) GetWorkingSensor(ctx context.Context, extra map[string]interfa
 
 		return backup, nil
 	}
-	return nil, fmt.Errorf("all %d backup sensors failed", len(b.backupList))
+
+	switch len(b.backupList) {
+	case 1:
+		return nil, fmt.Errorf("%d backup sensor failed", len(b.backupList))
+	default:
+		return nil, fmt.Errorf("all %d backup sensors failed", len(b.backupList))
+	}
 
 }
 
