@@ -35,6 +35,19 @@ func (cfg Config) Validate(path string) ([]string, error) {
 	return deps, nil
 }
 
+// CallAllFunctions is a helper to call all the inputted functions and return if one errors.
+func CallAllFunctions(ctx context.Context, s resource.Sensor, timeout int, extra map[string]interface{}, calls []func(context.Context, resource.Sensor, map[string]any) (any, error)) error {
+	for _, call := range calls {
+		_, err := TryReadingOrFail(ctx, timeout, s, call, extra)
+		// one of them errored, return
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+
+}
+
 // Go does not allow channels containing a tuple,
 // so defining the struct with readings and error
 // to send through a channel.
@@ -79,7 +92,7 @@ func TryReadingOrFail[K any](ctx context.Context,
 }
 
 // Since all sensors implement readings we can reuse the same wrapper for all models.
-func ReadingsWrapper(ctx context.Context, s resource.Sensor, extra map[string]any) (map[string]any, error) {
+func ReadingsWrapper(ctx context.Context, s resource.Sensor, extra map[string]any) (any, error) {
 	readings, err := s.Readings(ctx, extra)
 	if err != nil {
 		return nil, err
