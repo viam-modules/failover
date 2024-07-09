@@ -59,32 +59,32 @@ func setup(t *testing.T) (testPowerSensors, resource.Dependencies) {
 	}
 
 	powerSensors.backup1.VoltageFunc = func(ctx context.Context, extra map[string]any) (float64, bool, error) {
-		return 1, false, nil
+		return 2, false, nil
 	}
 	powerSensors.backup2.VoltageFunc = func(ctx context.Context, extra map[string]any) (float64, bool, error) {
-		return 1, false, nil
+		return 3, false, nil
 	}
 
 	powerSensors.primary.CurrentFunc = func(ctx context.Context, extra map[string]any) (float64, bool, error) {
-		return 1, false, nil
+		return 4, false, nil
 	}
 
 	powerSensors.backup1.CurrentFunc = func(ctx context.Context, extra map[string]any) (float64, bool, error) {
-		return 1, false, nil
+		return 5, false, nil
 	}
 	powerSensors.backup2.CurrentFunc = func(ctx context.Context, extra map[string]any) (float64, bool, error) {
-		return 1, false, nil
+		return 6, false, nil
 	}
 
 	powerSensors.primary.PowerFunc = func(ctx context.Context, extra map[string]any) (float64, error) {
-		return 1, nil
+		return 7, nil
 	}
 
 	powerSensors.backup1.PowerFunc = func(ctx context.Context, extra map[string]any) (float64, error) {
-		return 1, nil
+		return 8, nil
 	}
 	powerSensors.backup2.PowerFunc = func(ctx context.Context, extra map[string]any) (float64, error) {
-		return 1, nil
+		return 9, nil
 	}
 
 	powerSensors.primary.ReadingsFunc = func(ctx context.Context, extra map[string]any) (map[string]any, error) {
@@ -92,10 +92,10 @@ func setup(t *testing.T) (testPowerSensors, resource.Dependencies) {
 	}
 
 	powerSensors.backup1.ReadingsFunc = func(ctx context.Context, extra map[string]any) (map[string]any, error) {
-		return map[string]any{"foo": 1}, nil
+		return map[string]any{"foo": 2}, nil
 	}
 	powerSensors.backup2.ReadingsFunc = func(ctx context.Context, extra map[string]any) (map[string]any, error) {
-		return map[string]any{"foo": 1}, nil
+		return map[string]any{"foo": 3}, nil
 	}
 
 	return powerSensors, deps

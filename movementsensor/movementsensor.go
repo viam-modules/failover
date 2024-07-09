@@ -30,7 +30,8 @@ type failoverMovementSensor struct {
 	resource.Named
 	logger logging.Logger
 
-	primary *common.Primary
+	primary               *common.Primary
+	primaryMovementSensor movementsensor.MovementSensor
 
 	positionBackups           *common.Backups
 	linearVelocityBackups     *common.Backups
@@ -61,6 +62,8 @@ func newFailoverMovementSensor(ctx context.Context, deps resource.Dependencies, 
 	if err != nil {
 		return nil, err
 	}
+
+	s.primaryMovementSensor = primary
 
 	allBackups := []resource.Sensor{}
 	angularVelocityBackups := []resource.Sensor{}
@@ -264,7 +267,7 @@ func (ms *failoverMovementSensor) Readings(ctx context.Context, extra map[string
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
 
-	if ms.primary.UsePrimary {
+	if ms.primary.UsePrimary() {
 		readings, err := common.TryPrimary[map[string]any](ctx, ms.primary, extra, common.ReadingsWrapper)
 		if err == nil {
 			return readings, nil
@@ -272,16 +275,16 @@ func (ms *failoverMovementSensor) Readings(ctx context.Context, extra map[string
 	}
 
 	// Primary failed, find a working sensor
-	err := ms.allBackups.GetWorkingSensor(ctx, extra)
+	workingSensor, err := ms.allBackups.GetWorkingSensor(ctx, extra)
 	if err != nil {
 		return nil, fmt.Errorf("all movement sensors failed to get readings: %w", err)
 	}
 
 	// Read from the backups last working sensor.
 	// In the non-error case, the wrapper will never return its readings as nil.
-	readings, err := common.TryReadingOrFail(ctx, ms.timeout, ms.allBackups.LastWorkingSensor, common.ReadingsWrapper, extra)
+	readings, err := common.TryReadingOrFail(ctx, ms.timeout, workingSensor, common.ReadingsWrapper, extra)
 	if err != nil {
-		return nil, fmt.Errorf("all power sensors failed to get readings: %w", err)
+		return nil, fmt.Errorf("all movement sensors failed to get readings: %w", err)
 	}
 
 	reading := readings.(map[string]interface{})
@@ -294,14 +297,12 @@ func (ms *failoverMovementSensor) Accuracy(ctx context.Context, extra map[string
 }
 
 func (s *failoverMovementSensor) Properties(ctx context.Context, extra map[string]any) (*movementsensor.Properties, error) {
-	// props, err := s.primary.Properties(ctx, extra)
-	// if err != nil {
-	// 	return nil, err
-	// }
+	props, err := s.primaryMovementSensor.Properties(ctx, extra)
+	if err != nil {
+		return nil, err
+	}
 
-	return nil, nil
-
-	//return props, nil
+	return props, nil
 }
 
 func (s *failoverMovementSensor) Close(context.Context) error {
