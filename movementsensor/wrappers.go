@@ -6,6 +6,7 @@ import (
 
 	"github.com/golang/geo/r3"
 	geo "github.com/kellydunn/golang-geo"
+
 	"go.viam.com/rdk/components/movementsensor"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/spatialmath"
@@ -33,7 +34,6 @@ func positionWrapper(ctx context.Context, s resource.Sensor, extra map[string]an
 	vals.altitiude = alt
 
 	return vals, nil
-
 }
 
 func linearVelocityWrapper(ctx context.Context, s resource.Sensor, extra map[string]any) (any, error) {
@@ -47,7 +47,6 @@ func linearVelocityWrapper(ctx context.Context, s resource.Sensor, extra map[str
 		return r3.Vector{}, err
 	}
 	return vel, nil
-
 }
 
 func angularVelocityWrapper(ctx context.Context, s resource.Sensor, extra map[string]any) (any, error) {

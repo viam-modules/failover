@@ -1,4 +1,4 @@
-// package common
+// Package common
 package common
 
 import (
@@ -7,8 +7,9 @@ import (
 	"fmt"
 	"time"
 
-	"go.viam.com/rdk/resource"
 	"go.viam.com/utils"
+
+	"go.viam.com/rdk/resource"
 )
 
 // Config is used for converting config attributes.
@@ -36,7 +37,11 @@ func (cfg Config) Validate(path string) ([]string, error) {
 }
 
 // CallAllFunctions is a helper to call all the inputted functions and return if one errors.
-func CallAllFunctions(ctx context.Context, s resource.Sensor, timeout int, extra map[string]interface{}, calls []func(context.Context, resource.Sensor, map[string]any) (any, error)) error {
+func CallAllFunctions(ctx context.Context,
+	s resource.Sensor, timeout int,
+	extra map[string]interface{},
+	calls []func(context.Context, resource.Sensor, map[string]any) (any, error),
+) error {
 	for _, call := range calls {
 		_, err := TryReadingOrFail(ctx, timeout, s, call, extra)
 		// one of them errored, return
@@ -45,7 +50,6 @@ func CallAllFunctions(ctx context.Context, s resource.Sensor, timeout int, extra
 		}
 	}
 	return nil
-
 }
 
 // Go does not allow channels containing a tuple,
@@ -57,7 +61,10 @@ type ReadingsResult struct {
 }
 
 // getReading calls the inputted API call and returns the reading and error as a ReadingsResult struct.
-func getReading[K any](ctx context.Context, call func(context.Context, resource.Sensor, map[string]any) (K, error), s resource.Sensor, extra map[string]any) ReadingsResult {
+func getReading[K any](ctx context.Context,
+	call func(context.Context, resource.Sensor, map[string]any) (K, error), s resource.Sensor,
+	extra map[string]any,
+) ReadingsResult {
 	reading, err := call(ctx, s, extra)
 
 	return ReadingsResult{
@@ -66,14 +73,14 @@ func getReading[K any](ctx context.Context, call func(context.Context, resource.
 	}
 }
 
-// TryReadingorFail will call the inputted API and either error, timeout, or return the reading.
+// TryReadingOrFail will call the inputted API and either error, timeout, or return the reading.
 func TryReadingOrFail[K any](ctx context.Context,
 	timeout int,
 	s resource.Sensor,
 	call func(context.Context, resource.Sensor, map[string]any) (K, error),
 	extra map[string]any) (
-	K, error) {
-
+	K, error,
+) {
 	resultChan := make(chan ReadingsResult, 1)
 	var zero K
 	go func() {

@@ -16,6 +16,7 @@ import (
 	"go.viam.com/rdk/spatialmath"
 )
 
+// Model triplet.
 var Model = resource.NewModel("viam", "failover", "movementsensor")
 
 func init() {
@@ -26,7 +27,7 @@ func init() {
 	)
 }
 
-type functions = func(ctx context.Context, s resource.Sensor, extra map[string]any) (any, error)
+type call = func(ctx context.Context, s resource.Sensor, extra map[string]any) (any, error)
 
 type failoverMovementSensor struct {
 	resource.AlwaysRebuild
@@ -43,18 +44,20 @@ type failoverMovementSensor struct {
 	accuracyBackups           *common.Backups
 	compassHeadingBackups     *common.Backups
 	linearAccelerationBackups *common.Backups
-	allBackups                *common.Backups
+	readingsBackups           *common.Backups
 
 	timeout int
 
 	mu sync.Mutex
 }
 
-func constructMessage(function string, name string) string {
+func constructMessage(function, name string) string {
 	return fmt.Sprintf("primary doesn't support %s but backup %s does: consider using a merged movement sensor", function, name)
 }
 
-func newFailoverMovementSensor(ctx context.Context, deps resource.Dependencies, rawConf resource.Config, logger logging.Logger) (movementsensor.MovementSensor, error) {
+func newFailoverMovementSensor(ctx context.Context, deps resource.Dependencies, rawConf resource.Config, logger logging.Logger) (
+	movementsensor.MovementSensor, error,
+) {
 	conf, err := resource.NativeConfig[common.Config](rawConf)
 	if err != nil {
 		return nil, err
@@ -65,6 +68,12 @@ func newFailoverMovementSensor(ctx context.Context, deps resource.Dependencies, 
 		logger: logger,
 	}
 
+	// default timeout is 1 second.
+	s.timeout = 1000
+	if conf.Timeout > 0 {
+		s.timeout = conf.Timeout
+	}
+
 	primary, err := movementsensor.FromDependencies(deps, conf.Primary)
 	if err != nil {
 		return nil, err
@@ -72,6 +81,15 @@ func newFailoverMovementSensor(ctx context.Context, deps resource.Dependencies, 
 
 	s.primaryMovementSensor = primary
 
+	// get properties of the primary sensor and add all supported functions to calls
+	primaryProps, err := primary.Properties(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	s.constructPrimary(ctx, primaryProps)
+
+	// create list of backups for all APIs
 	allBackups := []resource.Sensor{}
 	angularVelocityBackups := []resource.Sensor{}
 	positionBackups := []resource.Sensor{}
@@ -80,71 +98,95 @@ func newFailoverMovementSensor(ctx context.Context, deps resource.Dependencies, 
 	compassHeadingBackups := []resource.Sensor{}
 	orientationBackups := []resource.Sensor{}
 
-	primaryProps, err := primary.Properties(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-
+	// loop through list of backups and get properties to add to list.
 	for _, backup := range conf.Backups {
 		backup, err := movementsensor.FromDependencies(deps, backup)
+		// if we couldnt get the backup, log the error and get the next one.
+		if err != nil {
+			s.logger.Errorf(err.Error())
+			continue
+		}
 		props, err := backup.Properties(ctx, nil)
 		if err != nil {
 			s.logger.Errorf(err.Error())
-		} else {
-			allBackups = append(allBackups, backup)
-			if props.AngularVelocitySupported {
-				if primaryProps.AngularVelocitySupported {
-					angularVelocityBackups = append(angularVelocityBackups, backup)
-				} else {
-					s.logger.Infof(constructMessage("angular velocity", backup.Name().ShortName()))
-				}
+			continue
+		}
+		allBackups = append(allBackups, backup)
+		if props.AngularVelocitySupported {
+			if primaryProps.AngularVelocitySupported {
+				angularVelocityBackups = append(angularVelocityBackups, backup)
+			} else {
+				s.logger.Infof(constructMessage("angular velocity", backup.Name().ShortName()))
 			}
-			if props.PositionSupported {
-				if primaryProps.PositionSupported {
-					positionBackups = append(positionBackups, backup)
-				} else {
-					s.logger.Infof(constructMessage("postion", backup.Name().ShortName()))
-				}
+		}
+		if props.PositionSupported {
+			if primaryProps.PositionSupported {
+				positionBackups = append(positionBackups, backup)
+			} else {
+				s.logger.Infof(constructMessage("position", backup.Name().ShortName()))
 			}
-			if props.LinearAccelerationSupported {
-				if primaryProps.LinearAccelerationSupported {
-					linearAccelerationBackups = append(linearAccelerationBackups, backup)
-				} else {
-					s.logger.Infof(constructMessage("linear acceleration", backup.Name().ShortName()))
-				}
+		}
+		if props.LinearAccelerationSupported {
+			if primaryProps.LinearAccelerationSupported {
+				linearAccelerationBackups = append(linearAccelerationBackups, backup)
+			} else {
+				s.logger.Infof(constructMessage("linear acceleration", backup.Name().ShortName()))
 			}
-			if props.LinearVelocitySupported {
-				if primaryProps.LinearVelocitySupported {
-					linearVelocityBackups = append(linearVelocityBackups, backup)
-				} else {
-					s.logger.Infof(constructMessage("linear velocity", backup.Name().ShortName()))
-				}
-
+		}
+		if props.LinearVelocitySupported {
+			if primaryProps.LinearVelocitySupported {
+				linearVelocityBackups = append(linearVelocityBackups, backup)
+			} else {
+				s.logger.Infof(constructMessage("linear velocity", backup.Name().ShortName()))
 			}
-			if props.OrientationSupported {
-				if primaryProps.OrientationSupported {
-					orientationBackups = append(orientationBackups, backup)
-				} else {
-					s.logger.Infof(constructMessage("orientation", backup.Name().ShortName()))
-				}
+		}
+		if props.OrientationSupported {
+			if primaryProps.OrientationSupported {
+				orientationBackups = append(orientationBackups, backup)
+			} else {
+				s.logger.Infof(constructMessage("orientation", backup.Name().ShortName()))
 			}
-			if props.CompassHeadingSupported {
-				if primaryProps.CompassHeadingSupported {
-					compassHeadingBackups = append(compassHeadingBackups, backup)
-				} else {
-					s.logger.Infof(constructMessage("compass headinf", backup.Name().ShortName()))
-				}
+		}
+		if props.CompassHeadingSupported {
+			if primaryProps.CompassHeadingSupported {
+				compassHeadingBackups = append(compassHeadingBackups, backup)
+			} else {
+				s.logger.Infof(constructMessage("compass heading", backup.Name().ShortName()))
 			}
 		}
 	}
 
-	// default timeout is 1 second.
-	s.timeout = 1000
-	if conf.Timeout > 0 {
-		s.timeout = conf.Timeout
+	if len(angularVelocityBackups) != 0 {
+		s.angularVelocityBackups = common.CreateBackup(s.timeout, angularVelocityBackups, []call{angularVelocityWrapper})
 	}
 
-	calls := []func(context.Context, resource.Sensor, map[string]any) (any, error){common.ReadingsWrapper}
+	if len(linearAccelerationBackups) != 0 {
+		s.linearAccelerationBackups = common.CreateBackup(s.timeout, linearAccelerationBackups, []call{linearAccelerationWrapper})
+	}
+
+	if len(linearVelocityBackups) != 0 {
+		s.linearVelocityBackups = common.CreateBackup(s.timeout, linearVelocityBackups, []call{linearVelocityWrapper})
+	}
+
+	if len(orientationBackups) != 0 {
+		s.orientationBackups = common.CreateBackup(s.timeout, orientationBackups, []call{orientationWrapper})
+	}
+	if len(compassHeadingBackups) != 0 {
+		s.compassHeadingBackups = common.CreateBackup(s.timeout, compassHeadingBackups, []call{compassHeadingWrapper})
+	}
+
+	if len(positionBackups) != 0 {
+		s.positionBackups = common.CreateBackup(s.timeout, positionBackups, []call{positionWrapper})
+	}
+
+	s.readingsBackups = common.CreateBackup(s.timeout, allBackups, []call{common.ReadingsWrapper})
+	s.accuracyBackups = common.CreateBackup(s.timeout, allBackups, []call{accuracyWrapper})
+
+	return s, nil
+}
+
+func (ms *failoverMovementSensor) constructPrimary(ctx context.Context, primaryProps *movementsensor.Properties) {
+	calls := []call{common.ReadingsWrapper}
 	if primaryProps.AngularVelocitySupported {
 		calls = append(calls, angularVelocityWrapper)
 	}
@@ -164,38 +206,10 @@ func newFailoverMovementSensor(ctx context.Context, deps resource.Dependencies, 
 		calls = append(calls, linearVelocityWrapper)
 	}
 
-	s.primary = common.CreatePrimary(ctx, s.timeout, s.logger, primary, calls)
-
-	if len(angularVelocityBackups) != 0 {
-		s.angularVelocityBackups = common.CreateBackup(s.timeout, angularVelocityBackups, []functions{angularVelocityWrapper})
-	}
-
-	if len(linearAccelerationBackups) != 0 {
-		s.linearAccelerationBackups = common.CreateBackup(s.timeout, linearAccelerationBackups, []functions{linearAccelerationWrapper})
-	}
-
-	if len(linearVelocityBackups) != 0 {
-		s.linearVelocityBackups = common.CreateBackup(s.timeout, linearVelocityBackups, []functions{linearVelocityWrapper})
-	}
-
-	if len(orientationBackups) != 0 {
-		s.orientationBackups = common.CreateBackup(s.timeout, orientationBackups, []functions{orientationWrapper})
-	}
-	if len(compassHeadingBackups) != 0 {
-		s.compassHeadingBackups = common.CreateBackup(s.timeout, compassHeadingBackups, []functions{compassHeadingWrapper})
-	}
-
-	if len(positionBackups) != 0 {
-		s.positionBackups = common.CreateBackup(s.timeout, positionBackups, []functions{positionWrapper})
-	}
-
-	s.allBackups = common.CreateBackup(s.timeout, allBackups, calls)
-
-	return s, nil
+	ms.primary = common.CreatePrimary(ctx, ms.timeout, ms.logger, ms.primaryMovementSensor, calls)
 }
 
 func (ms *failoverMovementSensor) Position(ctx context.Context, extra map[string]any) (*geo.Point, float64, error) {
-
 	props, err := ms.Properties(ctx, extra)
 	if err != nil {
 		return nil, 0, err
@@ -206,7 +220,7 @@ func (ms *failoverMovementSensor) Position(ctx context.Context, extra map[string
 
 	pos, err := getReading[postionVals](ctx, ms, positionWrapper, extra, ms.positionBackups)
 	if err != nil {
-		return nil, math.NaN(), fmt.Errorf("all movement sensors failed to get postion: %w", err)
+		return nil, math.NaN(), fmt.Errorf("all movement sensors failed to get position: %w", err)
 	}
 	return pos.position, pos.altitiude, nil
 }
@@ -238,7 +252,7 @@ func (ms *failoverMovementSensor) AngularVelocity(ctx context.Context, extra map
 
 	vel, err := getReading[spatialmath.AngularVelocity](ctx, ms, angularVelocityWrapper, extra, ms.angularVelocityBackups)
 	if err != nil {
-		return spatialmath.AngularVelocity{}, fmt.Errorf("all movement sensors failed to angular velocity: %w", err)
+		return spatialmath.AngularVelocity{}, fmt.Errorf("all movement sensors failed to get angular velocity: %w", err)
 	}
 
 	return vel, nil
@@ -259,7 +273,6 @@ func (ms *failoverMovementSensor) LinearAcceleration(ctx context.Context, extra 
 		return r3.Vector{}, fmt.Errorf("all movement sensors failed to get linear acceleration: %w", err)
 	}
 	return acc, nil
-
 }
 
 func (ms *failoverMovementSensor) CompassHeading(ctx context.Context, extra map[string]any) (float64, error) {
@@ -296,7 +309,7 @@ func (ms *failoverMovementSensor) Orientation(ctx context.Context, extra map[str
 }
 
 func (ms *failoverMovementSensor) Readings(ctx context.Context, extra map[string]any) (map[string]any, error) {
-	readings, err := getReading[map[string]any](ctx, ms, common.ReadingsWrapper, extra, ms.allBackups)
+	readings, err := getReading[map[string]any](ctx, ms, common.ReadingsWrapper, extra, ms.readingsBackups)
 	if err != nil {
 		return map[string]any{}, fmt.Errorf("all movement sensors failed to get readings: %w", err)
 	}
@@ -305,11 +318,17 @@ func (ms *failoverMovementSensor) Readings(ctx context.Context, extra map[string
 
 func (ms *failoverMovementSensor) Accuracy(ctx context.Context, extra map[string]any) (*movementsensor.Accuracy, error,
 ) {
-	return nil, nil
+	// Accuracy isn't included in properties so trying all the backups.
+	acc, err := getReading[*movementsensor.Accuracy](ctx, ms, accuracyWrapper, extra, ms.accuracyBackups)
+	if err != nil {
+		return nil, fmt.Errorf("all movement sensors failed to get accuracy: %w", err)
+	}
+	return acc, nil
 }
 
-func (s *failoverMovementSensor) Properties(ctx context.Context, extra map[string]any) (*movementsensor.Properties, error) {
-	props, err := s.primaryMovementSensor.Properties(ctx, extra)
+func (ms *failoverMovementSensor) Properties(ctx context.Context, extra map[string]any) (*movementsensor.Properties, error) {
+	// failover has same properties as primary
+	props, err := ms.primaryMovementSensor.Properties(ctx, extra)
 	if err != nil {
 		return nil, err
 	}
@@ -317,7 +336,11 @@ func (s *failoverMovementSensor) Properties(ctx context.Context, extra map[strin
 	return props, nil
 }
 
-func getReading[T any](ctx context.Context, ms *failoverMovementSensor, call functions, extra map[string]any, backups *common.Backups) (T, error) {
+func getReading[T any](ctx context.Context,
+	ms *failoverMovementSensor,
+	call call,
+	extra map[string]any, backups *common.Backups,
+) (T, error) {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
 	if ms.primary.UsePrimary() {
@@ -327,6 +350,7 @@ func getReading[T any](ctx context.Context, ms *failoverMovementSensor, call fun
 		}
 	}
 	var zero T
+
 	// Primary failed, find a working sensor
 	workingSensor, err := backups.GetWorkingSensor(ctx, extra)
 	if err != nil {
@@ -342,7 +366,9 @@ func getReading[T any](ctx context.Context, ms *failoverMovementSensor, call fun
 	return any(reading).(T), nil
 }
 
-func (s *failoverMovementSensor) Close(context.Context) error {
-	s.primary.Close()
+func (ms *failoverMovementSensor) Close(context.Context) error {
+	if ms.primary != nil {
+		ms.primary.Close()
+	}
 	return nil
 }
