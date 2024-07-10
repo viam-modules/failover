@@ -15,7 +15,12 @@ type Backups struct {
 
 	timeout int
 	calls   []func(context.Context, resource.Sensor, map[string]any) (any, error)
+
+	// CallsMap is only used for movement sensors to keep track of what API calls each backup supports.
+	CallsMap map[resource.Sensor][]Call
 }
+
+type Call = func(context.Context, resource.Sensor, map[string]any) (any, error)
 
 func CreateBackup(timeout int, backupList []resource.Sensor, calls []func(context.Context, resource.Sensor, map[string]any) (any, error)) *Backups {
 	backups := &Backups{
@@ -24,15 +29,25 @@ func CreateBackup(timeout int, backupList []resource.Sensor, calls []func(contex
 		lastWorkingSensor: backupList[0],
 		calls:             calls,
 	}
+
 	return backups
 
 }
 
 func (b *Backups) GetWorkingSensor(ctx context.Context, extra map[string]interface{}) (resource.Sensor, error) {
-	// First call all APIs for the lastworkingsensor, if it succeeeds then return.
 
 	lastWorking := b.getLastWorkingSensor()
-	err := CallAllFunctions(ctx, lastWorking, b.timeout, extra, b.calls)
+
+	// Get the API calls the sensor supports.
+	var calls []Call
+	if b.CallsMap != nil {
+		calls = b.CallsMap[lastWorking]
+	} else {
+		calls = b.calls
+	}
+
+	// First call all APIs for the lastworkingsensor, if it succeeeds then return.
+	err := CallAllFunctions(ctx, lastWorking, b.timeout, extra, calls)
 	if err == nil {
 		return lastWorking, nil
 	}
@@ -44,7 +59,12 @@ func (b *Backups) GetWorkingSensor(ctx context.Context, extra map[string]interfa
 			continue
 		}
 		// Loop through all API calls and record the errors
-		err := CallAllFunctions(ctx, backup, b.timeout, extra, b.calls)
+		if b.CallsMap != nil {
+			calls = b.CallsMap[backup]
+		} else {
+			calls = b.calls
+		}
+		err := CallAllFunctions(ctx, backup, b.timeout, extra, calls)
 		if err != nil {
 			continue
 		}

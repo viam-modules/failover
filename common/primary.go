@@ -99,8 +99,8 @@ func TryPrimary[T any](ctx context.Context,
 // Then, it calls all APIs on the primary sensor until they are all successful and updates the
 // UsePrimary flag.
 func (p *Primary) PollPrimaryForHealth() {
-	// poll every 10 ms.
-	ticker := time.NewTicker(time.Millisecond * 10)
+	// poll every 100 ms.
+	ticker := time.NewTicker(time.Millisecond * 100)
 	p.workers.AddWorkers(func(ctx context.Context) {
 		for {
 			select {

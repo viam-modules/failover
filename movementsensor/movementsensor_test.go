@@ -56,6 +56,87 @@ func setup(t *testing.T) (testMovementSensors, resource.Dependencies) {
 	deps[movementsensor.Named(backup1Name)] = movementSensors.backup1
 	deps[movementsensor.Named(backup2Name)] = movementSensors.backup2
 
+	movementSensors.primary.ReadingsFunc = func(ctx context.Context, extra map[string]interface{}) (map[string]any, error) {
+		return map[string]any{"a": 4}, nil
+	}
+
+	movementSensors.backup1.ReadingsFunc = func(ctx context.Context, extra map[string]interface{}) (map[string]any, error) {
+		return map[string]any{"a": 4}, nil
+	}
+
+	movementSensors.backup2.ReadingsFunc = func(ctx context.Context, extra map[string]interface{}) (map[string]any, error) {
+		return map[string]any{"a": 4}, nil
+	}
+
+	movementSensors.primary.LinearVelocityFunc = func(ctx context.Context, extra map[string]any) (r3.Vector, error) {
+		return r3.Vector{}, nil
+	}
+
+	movementSensors.backup1.LinearVelocityFunc = func(ctx context.Context, extra map[string]interface{}) (r3.Vector, error) {
+		return r3.Vector{}, nil
+	}
+
+	movementSensors.backup2.LinearVelocityFunc = func(ctx context.Context, extra map[string]interface{}) (r3.Vector, error) {
+		return r3.Vector{}, nil
+	}
+
+	movementSensors.primary.LinearAccelerationFunc = func(ctx context.Context, extra map[string]any) (r3.Vector, error) {
+		return r3.Vector{}, nil
+	}
+
+	movementSensors.backup1.LinearAccelerationFunc = func(ctx context.Context, extra map[string]any) (r3.Vector, error) {
+		return r3.Vector{}, nil
+	}
+
+	movementSensors.backup2.LinearAccelerationFunc = func(ctx context.Context, extra map[string]any) (r3.Vector, error) {
+		return r3.Vector{}, nil
+	}
+
+	movementSensors.primary.AngularVelocityFunc = func(ctx context.Context, extra map[string]any) (spatialmath.AngularVelocity, error) {
+		return spatialmath.AngularVelocity{}, nil
+	}
+
+	movementSensors.backup1.AngularVelocityFunc = func(ctx context.Context, extra map[string]any) (spatialmath.AngularVelocity, error) {
+		return spatialmath.AngularVelocity{}, nil
+	}
+
+	movementSensors.backup2.AngularVelocityFunc = func(ctx context.Context, extra map[string]any) (spatialmath.AngularVelocity, error) {
+		return spatialmath.AngularVelocity{}, nil
+	}
+
+	movementSensors.primary.CompassHeadingFunc = func(ctx context.Context, extra map[string]any) (float64, error) {
+		return 8, nil
+	}
+
+	movementSensors.backup1.CompassHeadingFunc = func(ctx context.Context, extra map[string]any) (float64, error) {
+		return 8, nil
+	}
+
+	movementSensors.backup2.CompassHeadingFunc = func(ctx context.Context, extra map[string]any) (float64, error) {
+		return 8, nil
+	}
+
+	movementSensors.primary.OrientationFunc = func(ctx context.Context, extra map[string]any) (spatialmath.Orientation, error) {
+		return &spatialmath.OrientationVector{}, nil
+	}
+
+	movementSensors.backup1.OrientationFunc = func(ctx context.Context, extra map[string]any) (spatialmath.Orientation, error) {
+		return &spatialmath.OrientationVector{}, nil
+	}
+
+	movementSensors.backup2.OrientationFunc = func(ctx context.Context, extra map[string]any) (spatialmath.Orientation, error) {
+		return &spatialmath.OrientationVector{}, nil
+	}
+	movementSensors.primary.PositionFunc = func(ctx context.Context, extra map[string]any) (*geo.Point, float64, error) {
+		return &geo.Point{}, 9, nil
+	}
+	movementSensors.backup1.PositionFunc = func(ctx context.Context, extra map[string]any) (*geo.Point, float64, error) {
+		return &geo.Point{}, 9, nil
+	}
+	movementSensors.backup2.PositionFunc = func(ctx context.Context, extra map[string]any) (*geo.Point, float64, error) {
+		return &geo.Point{}, 9, nil
+	}
+
 	movementSensors.primary.PropertiesFunc = func(ctx context.Context, extra map[string]interface{}) (*movementsensor.Properties, error) {
 		return &movementsensor.Properties{
 			PositionSupported:           true,
@@ -65,31 +146,6 @@ func setup(t *testing.T) (testMovementSensors, resource.Dependencies) {
 			OrientationSupported:        true,
 			AngularVelocitySupported:    true,
 		}, nil
-	}
-
-	movementSensors.primary.ReadingsFunc = func(ctx context.Context, extra map[string]interface{}) (map[string]any, error) {
-		return map[string]any{"a": 4}, nil
-	}
-
-	movementSensors.primary.LinearVelocityFunc = func(ctx context.Context, extra map[string]any) (r3.Vector, error) {
-		return r3.Vector{}, nil
-	}
-
-	movementSensors.primary.LinearAccelerationFunc = func(ctx context.Context, extra map[string]any) (r3.Vector, error) {
-		return r3.Vector{}, nil
-	}
-
-	movementSensors.primary.AngularVelocityFunc = func(ctx context.Context, extra map[string]any) (spatialmath.AngularVelocity, error) {
-		return spatialmath.AngularVelocity{}, nil
-	}
-	movementSensors.primary.CompassHeadingFunc = func(ctx context.Context, extra map[string]any) (float64, error) {
-		return 8, nil
-	}
-	movementSensors.primary.OrientationFunc = func(ctx context.Context, extra map[string]any) (spatialmath.Orientation, error) {
-		return &spatialmath.OrientationVector{}, nil
-	}
-	movementSensors.primary.PositionFunc = func(ctx context.Context, extra map[string]any) (*geo.Point, float64, error) {
-		return &geo.Point{}, 9, nil
 	}
 
 	movementSensors.backup1.PropertiesFunc = func(ctx context.Context, extra map[string]interface{}) (*movementsensor.Properties, error) {
@@ -112,6 +168,16 @@ func setup(t *testing.T) (testMovementSensors, resource.Dependencies) {
 			OrientationSupported:        true,
 			AngularVelocitySupported:    true,
 		}, nil
+	}
+
+	movementSensors.primary.AccuracyFunc = func(ctx context.Context, extra map[string]interface{}) (*movementsensor.Accuracy, error) {
+		return &movementsensor.Accuracy{NmeaFix: 2}, nil
+	}
+	movementSensors.backup1.AccuracyFunc = func(ctx context.Context, extra map[string]interface{}) (*movementsensor.Accuracy, error) {
+		return &movementsensor.Accuracy{NmeaFix: 2}, nil
+	}
+	movementSensors.backup2.AccuracyFunc = func(ctx context.Context, extra map[string]interface{}) (*movementsensor.Accuracy, error) {
+		return &movementsensor.Accuracy{NmeaFix: 2}, nil
 	}
 
 	return movementSensors, deps

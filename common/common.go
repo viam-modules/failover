@@ -4,7 +4,6 @@ package common
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"go.viam.com/utils"
@@ -91,7 +90,7 @@ func TryReadingOrFail[K any](ctx context.Context,
 		return zero, errors.New("sensor timed out")
 	case result := <-resultChan:
 		if result.err != nil {
-			return zero, fmt.Errorf("failed to get readings: %w", result.err)
+			return zero, result.err
 		} else {
 			return result.readings.(K), nil
 		}

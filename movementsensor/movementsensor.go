@@ -2,6 +2,7 @@ package failovermovementsensor
 
 import (
 	"context"
+	"errors"
 	"failover/common"
 	"fmt"
 	"math"
@@ -34,25 +35,13 @@ type failoverMovementSensor struct {
 	resource.Named
 	logger logging.Logger
 
+	mu                    sync.Mutex
 	primary               *common.Primary
 	primaryMovementSensor movementsensor.MovementSensor
 
-	positionBackups           *common.Backups
-	linearVelocityBackups     *common.Backups
-	angularVelocityBackups    *common.Backups
-	orientationBackups        *common.Backups
-	accuracyBackups           *common.Backups
-	compassHeadingBackups     *common.Backups
-	linearAccelerationBackups *common.Backups
-	readingsBackups           *common.Backups
+	backup *common.Backups
 
 	timeout int
-
-	mu sync.Mutex
-}
-
-func constructMessage(function, name string) string {
-	return fmt.Sprintf("primary doesn't support %s but backup %s does: consider using a merged movement sensor", function, name)
 }
 
 func newFailoverMovementSensor(ctx context.Context, deps resource.Dependencies, rawConf resource.Config, logger logging.Logger) (
@@ -78,28 +67,23 @@ func newFailoverMovementSensor(ctx context.Context, deps resource.Dependencies, 
 	if err != nil {
 		return nil, err
 	}
-
 	s.primaryMovementSensor = primary
 
-	// get properties of the primary sensor and add all supported functions to calls
+	// get properties of the primary sensor and add all supported functions to supoortedCall
 	primaryProps, err := primary.Properties(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	s.constructPrimary(ctx, primaryProps)
+	supportedCalls := s.constructPrimary(ctx, primaryProps)
 
 	// create list of backups for all APIs
-	allBackups := []resource.Sensor{}
-	angularVelocityBackups := []resource.Sensor{}
-	positionBackups := []resource.Sensor{}
-	linearVelocityBackups := []resource.Sensor{}
-	linearAccelerationBackups := []resource.Sensor{}
-	compassHeadingBackups := []resource.Sensor{}
-	orientationBackups := []resource.Sensor{}
+	backups := []resource.Sensor{}
 
-	// loop through list of backups and get properties to add to list.
+	callsMap := make(map[resource.Sensor][]func(context.Context, resource.Sensor, map[string]any) (any, error))
+	// loop through list of backups and get properties.
 	for _, backup := range conf.Backups {
+		calls := []call{common.ReadingsWrapper, accuracyWrapper}
 		backup, err := movementsensor.FromDependencies(deps, backup)
 		// if we couldnt get the backup, log the error and get the next one.
 		if err != nil {
@@ -111,81 +95,43 @@ func newFailoverMovementSensor(ctx context.Context, deps resource.Dependencies, 
 			s.logger.Errorf(err.Error())
 			continue
 		}
-		allBackups = append(allBackups, backup)
-		if props.AngularVelocitySupported {
-			if primaryProps.AngularVelocitySupported {
-				angularVelocityBackups = append(angularVelocityBackups, backup)
-			} else {
-				s.logger.Infof(constructMessage("angular velocity", backup.Name().ShortName()))
-			}
+
+		if primaryProps != props {
+			s.logger.Infof("backup %s has different properties than primary - consider using a merged movement sensor", backup.Name().ShortName())
 		}
-		if props.PositionSupported {
-			if primaryProps.PositionSupported {
-				positionBackups = append(positionBackups, backup)
-			} else {
-				s.logger.Infof(constructMessage("position", backup.Name().ShortName()))
-			}
-		}
-		if props.LinearAccelerationSupported {
-			if primaryProps.LinearAccelerationSupported {
-				linearAccelerationBackups = append(linearAccelerationBackups, backup)
-			} else {
-				s.logger.Infof(constructMessage("linear acceleration", backup.Name().ShortName()))
-			}
-		}
+
+		backups = append(backups, backup)
+
 		if props.LinearVelocitySupported {
-			if primaryProps.LinearVelocitySupported {
-				linearVelocityBackups = append(linearVelocityBackups, backup)
-			} else {
-				s.logger.Infof(constructMessage("linear velocity", backup.Name().ShortName()))
-			}
+			calls = append(calls, linearVelocityWrapper)
 		}
 		if props.OrientationSupported {
-			if primaryProps.OrientationSupported {
-				orientationBackups = append(orientationBackups, backup)
-			} else {
-				s.logger.Infof(constructMessage("orientation", backup.Name().ShortName()))
-			}
+			calls = append(calls, orientationWrapper)
+		}
+		if props.PositionSupported {
+			calls = append(calls, positionWrapper)
 		}
 		if props.CompassHeadingSupported {
-			if primaryProps.CompassHeadingSupported {
-				compassHeadingBackups = append(compassHeadingBackups, backup)
-			} else {
-				s.logger.Infof(constructMessage("compass heading", backup.Name().ShortName()))
-			}
+			calls = append(calls, compassHeadingWrapper)
 		}
+		if props.AngularVelocitySupported {
+			calls = append(calls, angularVelocityWrapper)
+		}
+		if props.LinearAccelerationSupported {
+			calls = append(calls, linearAccelerationWrapper)
+		}
+
+		callsMap[backup] = calls
+
 	}
 
-	if len(angularVelocityBackups) != 0 {
-		s.angularVelocityBackups = common.CreateBackup(s.timeout, angularVelocityBackups, []call{angularVelocityWrapper})
-	}
-
-	if len(linearAccelerationBackups) != 0 {
-		s.linearAccelerationBackups = common.CreateBackup(s.timeout, linearAccelerationBackups, []call{linearAccelerationWrapper})
-	}
-
-	if len(linearVelocityBackups) != 0 {
-		s.linearVelocityBackups = common.CreateBackup(s.timeout, linearVelocityBackups, []call{linearVelocityWrapper})
-	}
-
-	if len(orientationBackups) != 0 {
-		s.orientationBackups = common.CreateBackup(s.timeout, orientationBackups, []call{orientationWrapper})
-	}
-	if len(compassHeadingBackups) != 0 {
-		s.compassHeadingBackups = common.CreateBackup(s.timeout, compassHeadingBackups, []call{compassHeadingWrapper})
-	}
-
-	if len(positionBackups) != 0 {
-		s.positionBackups = common.CreateBackup(s.timeout, positionBackups, []call{positionWrapper})
-	}
-
-	s.readingsBackups = common.CreateBackup(s.timeout, allBackups, []call{common.ReadingsWrapper})
-	s.accuracyBackups = common.CreateBackup(s.timeout, allBackups, []call{accuracyWrapper})
+	s.backup = common.CreateBackup(s.timeout, backups, supportedCalls)
+	s.backup.CallsMap = callsMap
 
 	return s, nil
 }
 
-func (ms *failoverMovementSensor) constructPrimary(ctx context.Context, primaryProps *movementsensor.Properties) {
+func (ms *failoverMovementSensor) constructPrimary(ctx context.Context, primaryProps *movementsensor.Properties) []call {
 	calls := []call{common.ReadingsWrapper}
 	if primaryProps.AngularVelocitySupported {
 		calls = append(calls, angularVelocityWrapper)
@@ -207,25 +153,64 @@ func (ms *failoverMovementSensor) constructPrimary(ctx context.Context, primaryP
 	}
 
 	ms.primary = common.CreatePrimary(ctx, ms.timeout, ms.logger, ms.primaryMovementSensor, calls)
+	return calls
 }
 
 func (ms *failoverMovementSensor) Position(ctx context.Context, extra map[string]any) (*geo.Point, float64, error) {
+	ms.mu.Lock()
+	defer ms.mu.Unlock()
+
 	props, err := ms.Properties(ctx, extra)
 	if err != nil {
-		return nil, 0, err
+		return nil, math.NaN(), err
 	}
 	if !props.PositionSupported {
-		return nil, 0, movementsensor.ErrMethodUnimplementedPosition
+		return nil, math.NaN(), movementsensor.ErrMethodUnimplementedPosition
+	}
+	if ms.primary.UsePrimary() {
+		reading, err := common.TryPrimary[postionVals](ctx, ms.primary, extra, positionWrapper)
+		if err == nil {
+			return reading.position, reading.altitiude, nil
+		}
 	}
 
-	pos, err := getReading[postionVals](ctx, ms, positionWrapper, extra, ms.positionBackups)
+	// Primary failed, find a working sensor
+	workingSensor, err := ms.backup.GetWorkingSensor(ctx, extra)
 	if err != nil {
 		return nil, math.NaN(), fmt.Errorf("all movement sensors failed to get position: %w", err)
+	}
+
+	movs := workingSensor.(movementsensor.MovementSensor)
+
+	// get properties to determine if this API is supported on the next working backup.
+	props, err = movs.Properties(ctx, nil)
+	if err != nil {
+		return nil, math.NaN(), err
+	}
+	if !props.PositionSupported {
+		ms.logger.Warnf("next backup sensor %s does not support position", movs.Name().ShortName())
+		return nil, math.NaN(), nil
+	}
+
+	// Read from the backups last working sensor.
+	// In the non-error case, the wrapper will never return its readings as nil.
+	reading, err := common.TryReadingOrFail(ctx, ms.timeout, workingSensor, positionWrapper, extra)
+	if err != nil {
+		ms.logger.Warnf("next backup sensor %s does not support position", movs.Name().ShortName())
+		return nil, math.NaN(), nil
+	}
+
+	pos, ok := reading.(postionVals)
+	if !ok {
+		return nil, math.NaN(), errors.New("all movement sensors failed to get linear acceleration: type assertion failed")
 	}
 	return pos.position, pos.altitiude, nil
 }
 
 func (ms *failoverMovementSensor) LinearVelocity(ctx context.Context, extra map[string]any) (r3.Vector, error) {
+	ms.mu.Lock()
+	defer ms.mu.Unlock()
+
 	props, err := ms.Properties(ctx, extra)
 	if err != nil {
 		return r3.Vector{}, err
@@ -234,14 +219,50 @@ func (ms *failoverMovementSensor) LinearVelocity(ctx context.Context, extra map[
 		return r3.Vector{}, movementsensor.ErrMethodUnimplementedLinearVelocity
 	}
 
-	vel, err := getReading[r3.Vector](ctx, ms, linearVelocityWrapper, extra, ms.linearVelocityBackups)
+	if ms.primary.UsePrimary() {
+		reading, err := common.TryPrimary[r3.Vector](ctx, ms.primary, extra, linearVelocityWrapper)
+		if err == nil {
+			return reading, nil
+		}
+	}
+
+	// Primary failed, find a working sensor
+	workingSensor, err := ms.backup.GetWorkingSensor(ctx, extra)
 	if err != nil {
 		return r3.Vector{}, fmt.Errorf("all movement sensors failed to get linear velocity: %w", err)
+	}
+
+	movs := workingSensor.(movementsensor.MovementSensor)
+
+	// get properties to determine if this API is supported on the next working backup.
+	props, err = movs.Properties(ctx, nil)
+	if err != nil {
+		return r3.Vector{}, err
+	}
+	if !props.LinearAccelerationSupported {
+		ms.logger.Warnf("next backup sensor %s does not support linear velocity", movs.Name().ShortName())
+		return r3.Vector{}, nil
+	}
+
+	// Read from the backups last working sensor.
+	// In the non-error case, the wrapper will never return its readings as nil.
+	reading, err := common.TryReadingOrFail(ctx, ms.timeout, workingSensor, linearVelocityWrapper, extra)
+	if err != nil {
+
+		return r3.Vector{}, nil
+	}
+
+	vel, ok := reading.(r3.Vector)
+	if !ok {
+		return r3.Vector{}, errors.New("all movement sensors failed to get linear velocity: type assertion failed")
 	}
 	return vel, nil
 }
 
 func (ms *failoverMovementSensor) AngularVelocity(ctx context.Context, extra map[string]any) (spatialmath.AngularVelocity, error) {
+	ms.mu.Lock()
+	defer ms.mu.Unlock()
+
 	props, err := ms.Properties(ctx, extra)
 	if err != nil {
 		return spatialmath.AngularVelocity{}, err
@@ -250,49 +271,156 @@ func (ms *failoverMovementSensor) AngularVelocity(ctx context.Context, extra map
 		return spatialmath.AngularVelocity{}, movementsensor.ErrMethodUnimplementedAngularVelocity
 	}
 
-	vel, err := getReading[spatialmath.AngularVelocity](ctx, ms, angularVelocityWrapper, extra, ms.angularVelocityBackups)
+	if ms.primary.UsePrimary() {
+		reading, err := common.TryPrimary[spatialmath.AngularVelocity](ctx, ms.primary, extra, angularVelocityWrapper)
+		if err == nil {
+			return reading, nil
+		}
+	}
+
+	// Primary failed, find a working sensor
+	workingSensor, err := ms.backup.GetWorkingSensor(ctx, extra)
 	if err != nil {
 		return spatialmath.AngularVelocity{}, fmt.Errorf("all movement sensors failed to get angular velocity: %w", err)
 	}
 
+	movs := workingSensor.(movementsensor.MovementSensor)
+
+	// get properties to determine if this API is supported on the next working backup.
+	props, err = movs.Properties(ctx, nil)
+	if err != nil {
+		return spatialmath.AngularVelocity{}, err
+	}
+	if !props.LinearAccelerationSupported {
+		ms.logger.Warnf("next backup sensor %s does not support angular velocity", movs.Name().ShortName())
+		return spatialmath.AngularVelocity{}, nil
+	}
+
+	// Read from the backups last working sensor.
+	// In the non-error case, the wrapper will never return its readings as nil.
+	reading, err := common.TryReadingOrFail(ctx, ms.timeout, workingSensor, angularVelocityWrapper, extra)
+	if err != nil {
+		return spatialmath.AngularVelocity{}, fmt.Errorf("all movement sensors failed to get angular velocity: %w", err)
+	}
+
+	vel, ok := reading.(spatialmath.AngularVelocity)
+	if !ok {
+		return spatialmath.AngularVelocity{}, errors.New("all movement sensors failed to get angular velocity: type assertion failed")
+	}
 	return vel, nil
+
 }
 
 func (ms *failoverMovementSensor) LinearAcceleration(ctx context.Context, extra map[string]any) (r3.Vector, error) {
+	ms.mu.Lock()
+	defer ms.mu.Unlock()
+
 	// If this API is not supported on primary, return error
 	props, err := ms.Properties(ctx, extra)
 	if err != nil {
 		return r3.Vector{}, err
 	}
 	if !props.LinearAccelerationSupported {
-		return r3.Vector{}, movementsensor.ErrMethodUnimplementedAngularVelocity
+		return r3.Vector{}, movementsensor.ErrMethodUnimplementedLinearAcceleration
 	}
 
-	acc, err := getReading[r3.Vector](ctx, ms, linearAccelerationWrapper, extra, ms.linearAccelerationBackups)
+	if ms.primary.UsePrimary() {
+		reading, err := common.TryPrimary[r3.Vector](ctx, ms.primary, extra, linearAccelerationWrapper)
+		if err == nil {
+			return reading, nil
+		}
+	}
+
+	// Primary failed, find a working sensor
+	workingSensor, err := ms.backup.GetWorkingSensor(ctx, extra)
 	if err != nil {
 		return r3.Vector{}, fmt.Errorf("all movement sensors failed to get linear acceleration: %w", err)
 	}
+
+	movs := workingSensor.(movementsensor.MovementSensor)
+
+	// get properties to determine if this API is supported on the next working backup.
+	props, err = movs.Properties(ctx, nil)
+	if err != nil {
+		return r3.Vector{}, err
+	}
+	if !props.LinearAccelerationSupported {
+		ms.logger.Warnf("next backup sensor %s does not support linear acceleration", movs.Name().ShortName())
+		return r3.Vector{}, nil
+	}
+
+	// Read from the backups last working sensor.
+	// In the non-error case, the wrapper will never return its readings as nil.
+	reading, err := common.TryReadingOrFail(ctx, ms.timeout, workingSensor, linearAccelerationWrapper, extra)
+	if err != nil {
+		return r3.Vector{}, fmt.Errorf("all movement sensors failed to get linear acceleration: %w", err)
+	}
+
+	acc, ok := reading.(r3.Vector)
+	if !ok {
+		return r3.Vector{}, errors.New("all movement sensors failed to get linear acceleration: type assertion failed")
+	}
+
 	return acc, nil
 }
 
 func (ms *failoverMovementSensor) CompassHeading(ctx context.Context, extra map[string]any) (float64, error) {
+	ms.mu.Lock()
+	defer ms.mu.Unlock()
+
 	// If this API is not supported on primary, return error
 	props, err := ms.Properties(ctx, extra)
 	if err != nil {
 		return 0, err
 	}
 	if !props.CompassHeadingSupported {
-		return 0, movementsensor.ErrMethodUnimplementedAngularVelocity
+		return 0, movementsensor.ErrMethodUnimplementedCompassHeading
 	}
 
-	heading, err := getReading[float64](ctx, ms, compassHeadingWrapper, extra, ms.compassHeadingBackups)
-	if err != nil {
-		return 0, fmt.Errorf("all movement sensors failed to get compass heading: %w", err)
+	if ms.primary.UsePrimary() {
+		reading, err := common.TryPrimary[float64](ctx, ms.primary, extra, compassHeadingWrapper)
+		if err == nil {
+			return reading, nil
+		}
 	}
+
+	// Primary failed, find a working sensor
+	workingSensor, err := ms.backup.GetWorkingSensor(ctx, extra)
+	if err != nil {
+		return math.NaN(), fmt.Errorf("all movement sensors failed to get compass heading: %w", err)
+	}
+
+	movs := workingSensor.(movementsensor.MovementSensor)
+
+	// get properties to determine if this API is supported on the next working backup.
+	props, err = movs.Properties(ctx, nil)
+	if err != nil {
+		return math.NaN(), err
+	}
+	if !props.CompassHeadingSupported {
+		ms.logger.Warnf("next backup sensor %s does not support orientation", movs.Name().ShortName())
+		return math.NaN(), nil
+	}
+
+	// Read from the backups last working sensor.
+	// In the non-error case, the wrapper will never return its readings as nil.
+	reading, err := common.TryReadingOrFail(ctx, ms.timeout, workingSensor, compassHeadingWrapper, extra)
+	if err != nil {
+		return math.NaN(), fmt.Errorf("all movement sensors failed to get compass heading %w", err)
+	}
+
+	heading, ok := reading.(float64)
+	if !ok {
+		return math.NaN(), errors.New("all movement sensors failed to get compass heading: type assertion failed")
+	}
+
 	return heading, nil
 }
 
 func (ms *failoverMovementSensor) Orientation(ctx context.Context, extra map[string]any) (spatialmath.Orientation, error) {
+	ms.mu.Lock()
+	defer ms.mu.Unlock()
+
 	props, err := ms.Properties(ctx, extra)
 	if err != nil {
 		return nil, err
@@ -301,15 +429,48 @@ func (ms *failoverMovementSensor) Orientation(ctx context.Context, extra map[str
 		return nil, movementsensor.ErrMethodUnimplementedOrientation
 	}
 
-	ori, err := getReading[spatialmath.Orientation](ctx, ms, orientationWrapper, extra, ms.orientationBackups)
+	if ms.primary.UsePrimary() {
+		reading, err := common.TryPrimary[spatialmath.Orientation](ctx, ms.primary, extra, orientationWrapper)
+		if err == nil {
+			return reading, nil
+		}
+	}
+
+	// Primary failed, find a working sensor
+	workingSensor, err := ms.backup.GetWorkingSensor(ctx, extra)
 	if err != nil {
 		return nil, fmt.Errorf("all movement sensors failed to get orientation: %w", err)
 	}
+
+	movs := workingSensor.(movementsensor.MovementSensor)
+
+	// get properties to determine if this API is supported on the next working backup.
+	props, err = movs.Properties(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	if !props.OrientationSupported {
+		ms.logger.Warnf("next backup sensor %s does not support orientation", movs.Name().ShortName())
+		return nil, nil
+	}
+
+	// Read from the backups last working sensor.
+	// In the non-error case, the wrapper will never return its readings as nil.
+	reading, err := common.TryReadingOrFail(ctx, ms.timeout, workingSensor, orientationWrapper, extra)
+	if err != nil {
+		return nil, fmt.Errorf("all movement sensors failed to get orientation: %w", err)
+	}
+
+	ori, ok := reading.(spatialmath.Orientation)
+	if !ok {
+		return nil, errors.New("all movement sensors failed to get orientation: type assertion failed")
+	}
+
 	return ori, nil
 }
 
 func (ms *failoverMovementSensor) Readings(ctx context.Context, extra map[string]any) (map[string]any, error) {
-	readings, err := getReading[map[string]any](ctx, ms, common.ReadingsWrapper, extra, ms.readingsBackups)
+	readings, err := getReading[map[string]any](ctx, ms, common.ReadingsWrapper, extra, ms.backup)
 	if err != nil {
 		return map[string]any{}, fmt.Errorf("all movement sensors failed to get readings: %w", err)
 	}
@@ -318,8 +479,7 @@ func (ms *failoverMovementSensor) Readings(ctx context.Context, extra map[string
 
 func (ms *failoverMovementSensor) Accuracy(ctx context.Context, extra map[string]any) (*movementsensor.Accuracy, error,
 ) {
-	// Accuracy isn't included in properties so trying all the backups.
-	acc, err := getReading[*movementsensor.Accuracy](ctx, ms, accuracyWrapper, extra, ms.accuracyBackups)
+	acc, err := getReading[*movementsensor.Accuracy](ctx, ms, accuracyWrapper, extra, ms.backup)
 	if err != nil {
 		return nil, fmt.Errorf("all movement sensors failed to get accuracy: %w", err)
 	}
