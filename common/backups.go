@@ -38,7 +38,7 @@ func (b *Backups) GetWorkingSensor(ctx context.Context, extra map[string]interfa
 
 	lastWorking := b.getLastWorkingSensor()
 
-	// Get the API calls the sensor supports.
+	// Get the API calls the last working sensor supports.
 	var calls []Call
 	if b.CallsMap != nil {
 		calls = b.CallsMap[lastWorking]
@@ -46,7 +46,7 @@ func (b *Backups) GetWorkingSensor(ctx context.Context, extra map[string]interfa
 		calls = b.calls
 	}
 
-	// First call all APIs for the lastworkingsensor, if it succeeeds then return.
+	// First call all supported APIs for the lastworkingsensor, if it succeeeds then return.
 	err := CallAllFunctions(ctx, lastWorking, b.timeout, extra, calls)
 	if err == nil {
 		return lastWorking, nil
@@ -58,19 +58,13 @@ func (b *Backups) GetWorkingSensor(ctx context.Context, extra map[string]interfa
 		if backup == lastWorking {
 			continue
 		}
-		// Loop through all API calls and record the errors
-		if b.CallsMap != nil {
-			calls = b.CallsMap[backup]
-		} else {
-			calls = b.calls
-		}
+		// call all suported APIs, if one errors continue to the next backup.
 		err := CallAllFunctions(ctx, backup, b.timeout, extra, calls)
 		if err != nil {
 			continue
 		}
 		// all calls were successful, replace lastworkingsensor and return.
 		b.setLastWorkingSensor(backup)
-
 		return backup, nil
 	}
 

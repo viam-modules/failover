@@ -128,8 +128,6 @@ func (p *Primary) PollPrimaryForHealth() {
 	})
 }
 
-// separate health checks
-
 func (p *Primary) Close() {
 	close(p.pollPrimaryChan)
 	if p.workers != nil {
