@@ -5,14 +5,24 @@
   "description": "",
   "models": [
     {
-      "api": "",
-      "model": ""
+      "api": "viam:component:sensor",
+      "model": "viam:failover:sensor"
+    },
+    {
+      "api": "viam:component:power_sensor",
+      "model": "viam:failover:powersensor"
+    },
+    {
+      "api": "viam:component:movement_sensor",
+      "model": "viam:failover:sensor"
     }
+
   ],
 
   "build": {
-    "build": "make module.tar.gz",
-    "arch" : ["linux/amd64", "linux/arm64", "darwin/arm64"]
+    "build": "make build",
+    "arch" : ["linux/amd64", "linux/arm64", "darwin/arm64"],
+    "path" : "module.tar.gz"
   },
-  "entrypoint": ""
+  "entrypoint": "failover"
 }

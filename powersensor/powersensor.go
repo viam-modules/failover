@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	Model = resource.NewModel("viam", "failover", "powersensor")
+	Model = resource.NewModel("viam", "failover", "power_sensor")
 )
 
 func init() {
