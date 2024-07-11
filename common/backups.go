@@ -73,6 +73,7 @@ func (b *Backups) GetWorkingSensor(ctx context.Context, extra map[string]interfa
 	default:
 		return nil, fmt.Errorf("all %d backup sensors failed", len(b.backupList))
 	}
+
 }
 
 func (b *Backups) getLastWorkingSensor() resource.Sensor {
