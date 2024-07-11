@@ -202,7 +202,7 @@ func (ms *failoverMovementSensor) Position(ctx context.Context, extra map[string
 
 	pos, ok := reading.(postionVals)
 	if !ok {
-		return nil, math.NaN(), errors.New("all movement sensors failed to get linear acceleration: type assertion failed")
+		return nil, math.NaN(), errors.New("all movement sensors failed to get postion: type assertion failed")
 	}
 	return pos.position, pos.altitiude, nil
 }
@@ -398,7 +398,7 @@ func (ms *failoverMovementSensor) CompassHeading(ctx context.Context, extra map[
 		return math.NaN(), err
 	}
 	if !props.CompassHeadingSupported {
-		ms.logger.Warnf("next backup sensor %s does not support orientation", movs.Name().ShortName())
+		ms.logger.Warnf("next backup sensor %s does not support compass heading", movs.Name().ShortName())
 		return math.NaN(), nil
 	}
 
@@ -521,7 +521,7 @@ func getReading[T any](ctx context.Context,
 	// In the non-error case, the wrapper will never return its readings as nil.
 	reading, err := common.TryReadingOrFail(ctx, ms.timeout, workingSensor, call, extra)
 	if err != nil {
-		return zero, fmt.Errorf("all movement sensors failed to get compass heading: %w", err)
+		return zero, fmt.Errorf("all movement sensors failed: %w", err)
 	}
 	return any(reading).(T), nil
 }
