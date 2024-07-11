@@ -18,6 +18,9 @@ type Config struct {
 	Timeout int      `json:"timeout_ms,omitempty"`
 }
 
+// type call defines a general API call.
+type Call = func(context.Context, resource.Sensor, map[string]any) (any, error)
+
 // Validate performs config validation.
 func (cfg Config) Validate(path string) ([]string, error) {
 	var deps []string

@@ -28,8 +28,6 @@ func init() {
 	)
 }
 
-type call = func(ctx context.Context, s resource.Sensor, extra map[string]any) (any, error)
-
 type failoverMovementSensor struct {
 	resource.AlwaysRebuild
 	resource.Named
@@ -83,7 +81,7 @@ func newFailoverMovementSensor(ctx context.Context, deps resource.Dependencies, 
 	callsMap := make(map[resource.Sensor][]func(context.Context, resource.Sensor, map[string]any) (any, error))
 	// loop through list of backups and get properties.
 	for _, backup := range conf.Backups {
-		calls := []call{common.ReadingsWrapper, accuracyWrapper}
+		calls := []common.Call{common.ReadingsWrapper, accuracyWrapper}
 		backup, err := movementsensor.FromDependencies(deps, backup)
 		// if we couldnt get the backup, log the error and get the next one.
 		if err != nil {
@@ -131,8 +129,8 @@ func newFailoverMovementSensor(ctx context.Context, deps resource.Dependencies, 
 	return s, nil
 }
 
-func (ms *failoverMovementSensor) constructPrimary(ctx context.Context, primaryProps *movementsensor.Properties) []call {
-	calls := []call{common.ReadingsWrapper}
+func (ms *failoverMovementSensor) constructPrimary(ctx context.Context, primaryProps *movementsensor.Properties) []common.Call {
+	calls := []common.Call{common.ReadingsWrapper}
 	if primaryProps.AngularVelocitySupported {
 		calls = append(calls, angularVelocityWrapper)
 	}
@@ -498,7 +496,7 @@ func (ms *failoverMovementSensor) Properties(ctx context.Context, extra map[stri
 
 func getReading[T any](ctx context.Context,
 	ms *failoverMovementSensor,
-	call call,
+	call common.Call,
 	extra map[string]any, backups *common.Backups,
 ) (T, error) {
 	ms.mu.Lock()

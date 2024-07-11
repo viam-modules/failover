@@ -20,7 +20,6 @@ type Backups struct {
 	CallsMap map[resource.Sensor][]Call
 }
 
-type Call = func(context.Context, resource.Sensor, map[string]any) (any, error)
 
 func CreateBackup(timeout int, backupList []resource.Sensor, calls []func(context.Context, resource.Sensor, map[string]any) (any, error)) *Backups {
 	backups := &Backups{
