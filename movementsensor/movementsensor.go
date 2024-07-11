@@ -18,7 +18,7 @@ import (
 )
 
 // Model triplet.
-var Model = resource.NewModel("viam", "failover", "movementsensor")
+var Model = resource.NewModel("viam", "failover", "movement_sensor")
 
 func init() {
 	resource.RegisterComponent(movementsensor.API, Model,
