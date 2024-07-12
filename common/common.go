@@ -60,10 +60,13 @@ type ReadingsResult struct {
 func getReading[K any](ctx context.Context, call func(context.Context, resource.Sensor, map[string]any) (K, error), s resource.Sensor, extra map[string]any) ReadingsResult {
 	reading, err := call(ctx, s, extra)
 
-	return ReadingsResult{
+	result := ReadingsResult{
 		readings: reading,
 		err:      err,
 	}
+
+	return result
+
 }
 
 // TryReadingorFail will call the inputted API and either error, timeout, or return the reading.
@@ -72,15 +75,22 @@ func TryReadingOrFail[K any](ctx context.Context,
 	s resource.Sensor,
 	call func(context.Context, resource.Sensor, map[string]any) (K, error),
 	extra map[string]any) (
-	K, error) {
-
-	resultChan := make(chan ReadingsResult, 1)
+	K, error,
+) {
+	cancelCtx, cancel := context.WithCancel(ctx)
+	resultChan := make(chan ReadingsResult)
 	var zero K
 	go func() {
-		resultChan <- getReading(ctx, call, s, extra)
+		select {
+		case <-cancelCtx.Done():
+			return
+		case resultChan <- getReading(cancelCtx, call, s, extra):
+		}
 	}()
 	select {
 	case <-time.After(time.Duration(timeout) * time.Millisecond):
+		// timed out - cancel the context given to the API call and return
+		cancel()
 		return zero, errors.New("sensor timed out")
 	case result := <-resultChan:
 		if result.err != nil {
