@@ -1,8 +1,8 @@
 {
   "module_id": "viam:failover",
   "visibility": "private",
-  "url": "",
-  "description": "",
+  "url": "https://github.com/viam-modules/failover",
+  "description": "failover module allows you to desginate a primary component and backups to use if the primary fails.",
   "models": [
     {
       "api": "viam:component:sensor",
@@ -10,11 +10,11 @@
     },
     {
       "api": "viam:component:power_sensor",
-      "model": "viam:failover:powersensor"
+      "model": "viam:failover:power_sensor"
     },
     {
       "api": "viam:component:movement_sensor",
-      "model": "viam:failover:sensor"
+      "model": "viam:failover:movement_sensor"
     }
 
   ],
@@ -22,7 +22,7 @@
   "build": {
     "build": "make build",
     "arch" : ["linux/amd64", "linux/arm64", "darwin/arm64"],
-    "path" : "module.tar.gz"
+    "path" : "bin/failover"
   },
   "entrypoint": "failover"
 }
