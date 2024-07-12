@@ -3,9 +3,9 @@
 The failover module allows you to desiginate a primary and backup components in case of failure.
 # models
 
-`viam:failover:sensor`
-`viam:failover:power_sensor`
-`viam:failover:movement_sensor`
+`viam:failover:sensor` <br>
+`viam:failover:power_sensor` <br>
+`viam:failover:movement_sensor` <br>
 
 
 ### Attributes
