@@ -1,7 +1,8 @@
 # [`failover` module](<https://github.com/viam-modules/failover>)
 
 The failover module allows you to desiginate a primary and backup components in case of failure.
-# models
+
+### Models
 
 `viam:failover:sensor` <br>
 `viam:failover:power_sensor` <br>
@@ -17,7 +18,7 @@ The following attributes are available for all failover models:
 | `primary`  | string | **Required** | Name of the primary component.                                                                                                                                                                                                                   |
 | `backups` | string array |  **Required**  | List of backups to use if the primary component fails. The order in the array corresponds to the order they will be used in.
 
-### Example configuration:
+### Example configuration
 
 ```json
 {
