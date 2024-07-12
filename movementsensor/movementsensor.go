@@ -124,7 +124,7 @@ func newFailoverMovementSensor(ctx context.Context, deps resource.Dependencies, 
 	}
 
 	s.backup = common.CreateBackup(s.timeout, backups, supportedCalls)
-	s.backup.CallsMap = callsMap
+	s.backup.SetCallsMap(callsMap)
 
 	return s, nil
 }

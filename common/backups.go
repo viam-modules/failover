@@ -17,9 +17,8 @@ type Backups struct {
 	calls   []func(context.Context, resource.Sensor, map[string]any) (any, error)
 
 	// CallsMap is only used for movement sensors to keep track of what API calls each backup supports.
-	CallsMap map[resource.Sensor][]Call
+	callsMap map[resource.Sensor][]Call
 }
-
 
 func CreateBackup(timeout int, backupList []resource.Sensor, calls []func(context.Context, resource.Sensor, map[string]any) (any, error)) *Backups {
 	backups := &Backups{
@@ -39,8 +38,8 @@ func (b *Backups) GetWorkingSensor(ctx context.Context, extra map[string]interfa
 
 	// Get the API calls the last working sensor supports.
 	var calls []Call
-	if b.CallsMap != nil {
-		calls = b.CallsMap[lastWorking]
+	if b.callsMap != nil {
+		calls = b.callsMap[lastWorking]
 	} else {
 		calls = b.calls
 	}
@@ -85,4 +84,10 @@ func (b *Backups) setLastWorkingSensor(sensor resource.Sensor) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.lastWorkingSensor = sensor
+}
+
+func (b *Backups) SetCallsMap(callsMap map[resource.Sensor][]Call) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.callsMap = callsMap
 }
