@@ -12,13 +12,13 @@ import (
 	"go.viam.com/rdk/spatialmath"
 )
 
-type postionVals struct {
+type positionVals struct {
 	position  *geo.Point
 	altitiude float64
 }
 
 func positionWrapper(ctx context.Context, s resource.Sensor, extra map[string]any) (any, error) {
-	vals := postionVals{}
+	vals := positionVals{}
 
 	ms, ok := s.(movementsensor.MovementSensor)
 	if !ok {

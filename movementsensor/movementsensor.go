@@ -168,7 +168,7 @@ func (ms *failoverMovementSensor) Position(ctx context.Context, extra map[string
 	}
 
 	if ms.primary.UsePrimary() {
-		reading, err := common.TryPrimary[postionVals](ctx, ms.primary, extra, positionWrapper)
+		reading, err := common.TryPrimary[positionVals](ctx, ms.primary, extra, positionWrapper)
 		if err == nil {
 			ms.lastWorkingSensor = ms.primaryMovementSensor
 			return reading.position, reading.altitiude, nil
@@ -198,7 +198,7 @@ func (ms *failoverMovementSensor) Position(ctx context.Context, extra map[string
 		return nil, math.NaN(), nil
 	}
 
-	pos, ok := reading.(postionVals)
+	pos, ok := reading.(positionVals)
 	if !ok {
 		return nil, math.NaN(), errors.New("all movement sensors failed to get postion: type assertion failed")
 	}
