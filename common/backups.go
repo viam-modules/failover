@@ -29,7 +29,6 @@ func CreateBackup(timeout int, backupList []resource.Sensor, calls []func(contex
 	}
 
 	return backups
-
 }
 
 func (b *Backups) GetWorkingSensor(ctx context.Context, extra map[string]interface{}) (resource.Sensor, error) {
