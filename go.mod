@@ -54,7 +54,7 @@ require (
 	github.com/go-latex/latex v0.0.0-20230307184459-12ec69307ad9 // indirect
 	github.com/go-nlopt/nlopt v0.0.0-20230219125344-443d3362dcb5 // indirect
 	github.com/go-pdf/fpdf v0.6.0 // indirect
-	github.com/go-viper/mapstructure/v2 v2.0.0-alpha.1 // indirect
+	github.com/go-viper/mapstructure/v2 v2.0.0 // indirect
 	github.com/goccy/go-json v0.10.2 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
@@ -86,6 +86,7 @@ require (
 	github.com/lib/pq v1.10.9 // indirect
 	github.com/lmittmann/ppm v1.0.2 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
+	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.14 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/miekg/dns v1.1.53 // indirect
@@ -94,6 +95,7 @@ require (
 	github.com/montanaflynn/stats v0.7.0 // indirect
 	github.com/muesli/clusters v0.0.0-20200529215643-2700303c1762 // indirect
 	github.com/muesli/kmeans v0.3.1 // indirect
+	github.com/pelletier/go-toml/v2 v2.2.2 // indirect
 	github.com/pion/datachannel v1.5.5 // indirect
 	github.com/pion/dtls/v2 v2.2.7 // indirect
 	github.com/pion/ice/v2 v2.3.13 // indirect
@@ -138,7 +140,7 @@ require (
 	go.viam.com/api v0.1.311 // indirect
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20230525183740-e7c30c78aeb2 // indirect
 	golang.org/x/crypto v0.24.0 // indirect
-	golang.org/x/exp v0.0.0-20230725012225-302865e7556b // indirect
+	golang.org/x/exp v0.0.0-20240103183307-be819d1f06fc // indirect
 	golang.org/x/image v0.15.0 // indirect
 	golang.org/x/mod v0.18.0 // indirect
 	golang.org/x/net v0.26.0 // indirect
