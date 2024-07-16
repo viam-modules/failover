@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"failover/common"
+
 	"go.viam.com/rdk/components/powersensor"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
@@ -70,9 +71,7 @@ func newFailoverPowerSensor(ctx context.Context, deps resource.Dependencies, con
 		backups = append(backups, backup)
 	}
 
-	calls := []func(context.Context, resource.Sensor, map[string]any) (any, error){
-		voltageWrapper, currentWrapper, powerWrapper, common.ReadingsWrapper,
-	}
+	calls := []common.Call{voltageWrapper, currentWrapper, powerWrapper, common.ReadingsWrapper}
 	ps.primary = common.CreatePrimary(ctx, ps.timeout, logger, primary, calls)
 	ps.backups = common.CreateBackup(ps.timeout, backups, calls)
 

@@ -14,7 +14,7 @@ type Backups struct {
 	lastWorkingSensor resource.Sensor
 
 	timeout int
-	calls   []func(context.Context, resource.Sensor, map[string]any) (any, error)
+	calls   []Call
 
 	// CallsMap is only used for movement sensors to keep track of what API calls each backup supports.
 	callsMap map[resource.Sensor][]Call
@@ -47,7 +47,7 @@ func (b *Backups) GetWorkingSensor(ctx context.Context, extra map[string]interfa
 		calls = b.calls
 	}
 
-	// First call all supported APIs for the lastworkingsensor, if it succeeeds then return.
+	// First call all supported APIs for the lastworkingsensor, if it succeeds then return.
 	err := CallAllFunctions(ctx, lastWorking, b.timeout, extra, calls)
 	if err == nil {
 		return lastWorking, nil

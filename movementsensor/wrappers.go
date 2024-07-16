@@ -12,6 +12,10 @@ import (
 	"go.viam.com/rdk/spatialmath"
 )
 
+// Wrapping all of movementsensor APIs to return one struct containing their return values as any.
+// These wrappers can be used as parameters in the generic helper functions.
+// All wrapper functions must return any to store them in the backups struct.
+
 type positionVals struct {
 	position  *geo.Point
 	altitiude float64

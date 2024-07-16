@@ -70,7 +70,7 @@ func newFailoverMovementSensor(ctx context.Context, deps resource.Dependencies, 
 	s.primaryMovementSensor = primary
 	s.lastWorkingSensor = primary
 
-	// get properties of the primary sensor and add all supported functions to supoortedCall
+	// get properties of the primary sensor and add all supported functions to supportedCalls
 	primaryProps, err := primary.Properties(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -83,7 +83,7 @@ func newFailoverMovementSensor(ctx context.Context, deps resource.Dependencies, 
 	// create list of backups for all APIs
 	backups := []resource.Sensor{}
 
-	callsMap := make(map[resource.Sensor][]func(context.Context, resource.Sensor, map[string]any) (any, error))
+	callsMap := make(map[resource.Sensor][]common.Call)
 	// loop through list of backups and get properties.
 	for _, backup := range conf.Backups {
 		calls := []common.Call{common.ReadingsWrapper, accuracyWrapper}

@@ -43,7 +43,7 @@ func CallAllFunctions(ctx context.Context,
 	s resource.Sensor,
 	timeout int,
 	extra map[string]interface{},
-	calls []func(context.Context, resource.Sensor, map[string]any) (any, error),
+	calls []Call,
 ) error {
 	for _, call := range calls {
 		_, err := TryReadingOrFail(ctx, timeout, s, call, extra)
