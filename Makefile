@@ -15,12 +15,13 @@ test:
 	go test ./...
 
 
-# tool-install:
-# 	GOBIN=`pwd`/$(TOOL_BIN) go install \
-# 		github.com/golangci/golangci-lint
+tool-install:
+	go mod download github.com/golangci/golangci-lint
+	go mod tidy
+	GOBIN=`pwd`/$(TOOL_BIN) go install \
+		github.com/golangci/golangci-lint/cmd/golangci-lint
 
-
-lint:
+lint: tool-install
 	go mod tidy
 	golangci-lint run -v --fix --config=./etc/.golangci.yaml
 
