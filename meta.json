@@ -2,7 +2,8 @@
   "module_id": "viam:failover",
   "visibility": "private",
   "url": "https://github.com/viam-modules/failover",
-  "description": "failover module allows you to desginate a primary component and backups to use if the primary fails.",
+  "description": "This module includes failover models for sensor, power sensor, and movement sensor. Failover allows you to desginate a primary component and backups to calls in the case the primary fails.",
+
   "models": [
     {
       "api": "viam:component:sensor",
@@ -18,7 +19,7 @@
     }
 
   ],
-  
+
   "build": {
     "build": "make module.tar.gz",
     "arch" : ["linux/amd64", "linux/arm64", "darwin/arm64"],
