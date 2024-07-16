@@ -17,7 +17,10 @@ test:
 
 tool-install:
 	GOBIN=`pwd`/$(TOOL_BIN) go install \
+		github.com/edaniels/golinters/cmd/combined \
 		github.com/golangci/golangci-lint/cmd/golangci-lint \
+		github.com/rhysd/actionlint/cmd/actionlint
+		go mod download github.com/golangci/golangci-lint
 
 
 lint: tool-install
