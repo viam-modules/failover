@@ -15,6 +15,7 @@ The following attributes are available for all failover models:
 ### Example configurations
 
 ## `viam:failover:sensor` <br>
+```json
   {
       "name": "my-failover-sensor",
       "model": "viam:failover:sensor",
@@ -28,8 +29,10 @@ The following attributes are available for all failover models:
         ]
       }
   }
+```
 
 ## `viam:failover:power_sensor` <br>
+```json
   {
       "name": "my-failover-power-sensor",
       "model": "viam:failover:power_sensor",
@@ -42,8 +45,10 @@ The following attributes are available for all failover models:
         ]
       }
   }
+```
 
-`viam:failover:movement_sensor` <br>
+## `viam:failover:movement_sensor`
+```json
   {
       "name": "my-failover-movement-sensor",
       "model": "viam:failover:movement_sensor",
@@ -56,3 +61,4 @@ The following attributes are available for all failover models:
         ]
       }
   }
+  ```
