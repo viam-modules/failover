@@ -41,7 +41,7 @@ type failoverMovementSensor struct {
 	backup *common.Backups
 
 	lastWorkingSensor movementsensor.MovementSensor
-	timeout           int
+	timeoutMs         int
 }
 
 func newFailoverMovementSensor(ctx context.Context, deps resource.Dependencies, rawConf resource.Config, logger logging.Logger) (
@@ -58,9 +58,9 @@ func newFailoverMovementSensor(ctx context.Context, deps resource.Dependencies, 
 	}
 
 	// default timeout is 1 second.
-	s.timeout = 1000
+	s.timeoutMs = 1000
 	if conf.Timeout > 0 {
-		s.timeout = conf.Timeout
+		s.timeoutMs = conf.Timeout
 	}
 
 	primary, err := movementsensor.FromDependencies(deps, conf.Primary)
@@ -86,7 +86,6 @@ func newFailoverMovementSensor(ctx context.Context, deps resource.Dependencies, 
 	callsMap := make(map[resource.Sensor][]common.Call)
 	// loop through list of backups and get properties.
 	for _, backup := range conf.Backups {
-		calls := []common.Call{common.ReadingsWrapper, accuracyWrapper}
 		backup, err := movementsensor.FromDependencies(deps, backup)
 		// if we couldnt get the backup, log the error and get the next one.
 		if err != nil {
@@ -104,58 +103,44 @@ func newFailoverMovementSensor(ctx context.Context, deps resource.Dependencies, 
 		}
 
 		backups = append(backups, backup)
-
-		if props.LinearVelocitySupported {
-			calls = append(calls, linearVelocityWrapper)
-		}
-		if props.OrientationSupported {
-			calls = append(calls, orientationWrapper)
-		}
-		if props.PositionSupported {
-			calls = append(calls, positionWrapper)
-		}
-		if props.CompassHeadingSupported {
-			calls = append(calls, compassHeadingWrapper)
-		}
-		if props.AngularVelocitySupported {
-			calls = append(calls, angularVelocityWrapper)
-		}
-		if props.LinearAccelerationSupported {
-			calls = append(calls, linearAccelerationWrapper)
-		}
-
+		calls := createCalls(props)
 		callsMap[backup] = calls
 
 	}
 
-	s.backup = common.CreateBackup(s.timeout, backups, supportedCalls)
+	s.backup = common.CreateBackup(s.timeoutMs, backups, supportedCalls)
 	s.backup.SetCallsMap(callsMap)
 
 	return s, nil
 }
 
 func (ms *failoverMovementSensor) constructPrimary(ctx context.Context, primaryProps *movementsensor.Properties) []common.Call {
-	calls := []common.Call{common.ReadingsWrapper}
-	if primaryProps.AngularVelocitySupported {
-		calls = append(calls, angularVelocityWrapper)
-	}
-	if primaryProps.CompassHeadingSupported {
-		calls = append(calls, compassHeadingWrapper)
-	}
-	if primaryProps.LinearAccelerationSupported {
-		calls = append(calls, linearAccelerationWrapper)
-	}
-	if primaryProps.OrientationSupported {
-		calls = append(calls, orientationWrapper)
-	}
-	if primaryProps.PositionSupported {
-		calls = append(calls, positionWrapper)
-	}
-	if primaryProps.LinearVelocitySupported {
+	calls := createCalls(ms.primaryProps)
+	ms.primary = common.CreatePrimary(ctx, ms.timeoutMs, ms.logger, ms.primaryMovementSensor, calls)
+	return calls
+}
+
+// createCalls is a helper function to create a list of API calls supported from the properties.
+func createCalls(props *movementsensor.Properties) []common.Call {
+	calls := []common.Call{common.ReadingsWrapper, accuracyWrapper}
+	if props.LinearVelocitySupported {
 		calls = append(calls, linearVelocityWrapper)
 	}
-
-	ms.primary = common.CreatePrimary(ctx, ms.timeout, ms.logger, ms.primaryMovementSensor, calls)
+	if props.OrientationSupported {
+		calls = append(calls, orientationWrapper)
+	}
+	if props.PositionSupported {
+		calls = append(calls, positionWrapper)
+	}
+	if props.CompassHeadingSupported {
+		calls = append(calls, compassHeadingWrapper)
+	}
+	if props.AngularVelocitySupported {
+		calls = append(calls, angularVelocityWrapper)
+	}
+	if props.LinearAccelerationSupported {
+		calls = append(calls, linearAccelerationWrapper)
+	}
 	return calls
 }
 
@@ -191,7 +176,7 @@ func (ms *failoverMovementSensor) Position(ctx context.Context, extra map[string
 
 	// Read from the backups last working sensor.
 	// In the non-error case, the wrapper will never return its readings as nil.
-	reading, err := common.TryReadingOrFail(ctx, ms.timeout, movs, positionWrapper, extra)
+	reading, err := common.TryReadingOrFail(ctx, ms.timeoutMs, movs, positionWrapper, extra)
 	if err != nil {
 		return nil, math.NaN(), fmt.Errorf("failed to get position: %w", err)
 	}
@@ -235,7 +220,7 @@ func (ms *failoverMovementSensor) LinearVelocity(ctx context.Context, extra map[
 
 	// Read from the backups last working sensor.
 	// In the non-error case, the wrapper will never return its readings as nil.
-	reading, err := common.TryReadingOrFail(ctx, ms.timeout, workingSensor, linearVelocityWrapper, extra)
+	reading, err := common.TryReadingOrFail(ctx, ms.timeoutMs, workingSensor, linearVelocityWrapper, extra)
 	if err != nil {
 
 		return r3.Vector{}, nil
@@ -285,7 +270,7 @@ func (ms *failoverMovementSensor) AngularVelocity(ctx context.Context, extra map
 
 	// Read from the backups last working sensor.
 	// In the non-error case, the wrapper will never return its readings as nil.
-	reading, err := common.TryReadingOrFail(ctx, ms.timeout, lastWorking, angularVelocityWrapper, extra)
+	reading, err := common.TryReadingOrFail(ctx, ms.timeoutMs, lastWorking, angularVelocityWrapper, extra)
 	if err != nil {
 		return spatialmath.AngularVelocity{}, fmt.Errorf("failed to get angular velocity: %w", err)
 	}
@@ -332,7 +317,7 @@ func (ms *failoverMovementSensor) LinearAcceleration(ctx context.Context, extra 
 
 	// Read from the backups last working sensor.
 	// In the non-error case, the wrapper will never return its readings as nil.
-	reading, err := common.TryReadingOrFail(ctx, ms.timeout, workingSensor, linearAccelerationWrapper, extra)
+	reading, err := common.TryReadingOrFail(ctx, ms.timeoutMs, workingSensor, linearAccelerationWrapper, extra)
 	if err != nil {
 		return r3.Vector{}, fmt.Errorf("failed to get linear acceleration: %w", err)
 	}
@@ -379,7 +364,7 @@ func (ms *failoverMovementSensor) CompassHeading(ctx context.Context, extra map[
 
 	// Read from the backups last working sensor.
 	// In the non-error case, the wrapper will never return its readings as nil.
-	reading, err := common.TryReadingOrFail(ctx, ms.timeout, workingSensor, compassHeadingWrapper, extra)
+	reading, err := common.TryReadingOrFail(ctx, ms.timeoutMs, workingSensor, compassHeadingWrapper, extra)
 	if err != nil {
 		return math.NaN(), fmt.Errorf("failed to get compass heading %w", err)
 	}
@@ -425,7 +410,7 @@ func (ms *failoverMovementSensor) Orientation(ctx context.Context, extra map[str
 
 	// Read from the backups last working sensor.
 	// In the non-error case, the wrapper will never return its readings as nil.
-	reading, err := common.TryReadingOrFail(ctx, ms.timeout, workingSensor, orientationWrapper, extra)
+	reading, err := common.TryReadingOrFail(ctx, ms.timeoutMs, workingSensor, orientationWrapper, extra)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get orientation: %w", err)
 	}
@@ -498,7 +483,7 @@ func getReading[T any](ctx context.Context,
 
 	// Read from the backups last working sensor.
 	// In the non-error case, the wrapper will never return its readings as nil.
-	reading, err := common.TryReadingOrFail(ctx, ms.timeout, workingSensor, call, extra)
+	reading, err := common.TryReadingOrFail(ctx, ms.timeoutMs, workingSensor, call, extra)
 	if err != nil {
 		return zero, fmt.Errorf("all movement sensors failed: %w", err)
 	}
