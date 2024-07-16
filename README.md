@@ -12,9 +12,9 @@ The following attributes are available for all failover models:
 | `primary`  | string | **Required** | Name of the primary component.                                                                                                                                                                                                                   |
 | `backups` | string array |  **Required**  | List of backups to use if the primary component fails. The order in the array corresponds to the order they will be used in.
 
-### Example configurations
+## Example configurations
 
-## `viam:failover:sensor` <br>
+###`viam:failover:sensor`
 ```json
   {
       "name": "my-failover-sensor",
@@ -31,7 +31,8 @@ The following attributes are available for all failover models:
   }
 ```
 
-## `viam:failover:power_sensor` <br>
+
+### `viam:failover:power_sensor` <br>
 ```json
   {
       "name": "my-failover-power-sensor",
@@ -47,7 +48,7 @@ The following attributes are available for all failover models:
   }
 ```
 
-## `viam:failover:movement_sensor`
+### `viam:failover:movement_sensor`
 ```json
   {
       "name": "my-failover-movement-sensor",
