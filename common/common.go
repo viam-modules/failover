@@ -1,4 +1,4 @@
-// Package common
+// Package common has all common functions
 package common
 
 import (
@@ -40,7 +40,8 @@ func (cfg Config) Validate(path string) ([]string, error) {
 
 // CallAllFunctions is a helper to call all the inputted functions and return if one errors.
 func CallAllFunctions(ctx context.Context,
-	s resource.Sensor, timeout int,
+	s resource.Sensor,
+	timeout int,
 	extra map[string]interface{},
 	calls []func(context.Context, resource.Sensor, map[string]any) (any, error),
 ) error {
@@ -54,6 +55,7 @@ func CallAllFunctions(ctx context.Context,
 	return nil
 }
 
+// ReadingsResult struct to return readings and error
 // Go does not allow channels containing a tuple,
 // so defining the struct with readings and error
 // to send through a channel.
@@ -64,7 +66,8 @@ type ReadingsResult struct {
 
 // getReading calls the inputted API call and returns the reading and error as a ReadingsResult struct.
 func getReading[K any](ctx context.Context,
-	call func(context.Context, resource.Sensor, map[string]any) (K, error), s resource.Sensor,
+	call func(context.Context, resource.Sensor, map[string]any) (K, error),
+	s resource.Sensor,
 	extra map[string]any,
 ) ReadingsResult {
 	reading, err := call(ctx, s, extra)
@@ -100,6 +103,7 @@ func TryReadingOrFail[K any](ctx context.Context,
 	}
 }
 
+// ReadingsWrapper wraps readings API.
 // Since all sensors implement readings we can reuse the same wrapper for all models.
 func ReadingsWrapper(ctx context.Context, s resource.Sensor, extra map[string]any) (any, error) {
 	readings, err := s.Readings(ctx, extra)

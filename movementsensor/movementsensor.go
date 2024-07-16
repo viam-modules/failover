@@ -1,3 +1,4 @@
+// Package movementsensor implements movementsensor
 package failovermovementsensor
 
 import (
@@ -10,7 +11,6 @@ import (
 
 	"github.com/golang/geo/r3"
 	geo "github.com/kellydunn/golang-geo"
-
 	"go.viam.com/rdk/components/movementsensor"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
@@ -177,7 +177,7 @@ func (ms *failoverMovementSensor) Position(ctx context.Context, extra map[string
 
 	movs, err := ms.getLastWorkingBackup(ctx, extra)
 	if err != nil {
-		return nil, math.NaN(), fmt.Errorf("failed to get positon: %w", err)
+		return nil, math.NaN(), fmt.Errorf("failed to get posiiton: %w", err)
 	}
 
 	// get properties to determine if this API is supported on the next working backup.
@@ -186,21 +186,19 @@ func (ms *failoverMovementSensor) Position(ctx context.Context, extra map[string
 		return nil, math.NaN(), err
 	}
 	if !props.PositionSupported {
-		ms.logger.Warnf("next backup sensor %s does not support position", movs.Name().ShortName())
-		return nil, math.NaN(), nil
+		return nil, math.NaN(), fmt.Errorf("next backup sensor %s does not support position", movs.Name().ShortName())
 	}
 
 	// Read from the backups last working sensor.
 	// In the non-error case, the wrapper will never return its readings as nil.
 	reading, err := common.TryReadingOrFail(ctx, ms.timeout, movs, positionWrapper, extra)
 	if err != nil {
-		ms.logger.Warnf("next backup sensor %s does not support position", movs.Name().ShortName())
-		return nil, math.NaN(), nil
+		return nil, math.NaN(), fmt.Errorf("failed to get posiiton: %w", err)
 	}
 
 	pos, ok := reading.(positionVals)
 	if !ok {
-		return nil, math.NaN(), errors.New("all movement sensors failed to get postion: type assertion failed")
+		return nil, math.NaN(), errors.New("failed to get postion: type assertion failed")
 	}
 	return pos.position, pos.altitiude, nil
 }
@@ -232,8 +230,7 @@ func (ms *failoverMovementSensor) LinearVelocity(ctx context.Context, extra map[
 		return r3.Vector{}, err
 	}
 	if !props.LinearAccelerationSupported {
-		ms.logger.Warnf("next backup sensor %s does not support linear velocity", workingSensor.Name().ShortName())
-		return r3.Vector{}, nil
+		return r3.Vector{}, fmt.Errorf("next backup sensor %s does not support linear velocity", workingSensor.Name().ShortName())
 	}
 
 	// Read from the backups last working sensor.
@@ -246,7 +243,7 @@ func (ms *failoverMovementSensor) LinearVelocity(ctx context.Context, extra map[
 
 	vel, ok := reading.(r3.Vector)
 	if !ok {
-		return r3.Vector{}, errors.New("all movement sensors failed to get linear velocity: type assertion failed")
+		return r3.Vector{}, errors.New("failed to get linear velocity: type assertion failed")
 	}
 	return vel, nil
 }
@@ -274,7 +271,7 @@ func (ms *failoverMovementSensor) AngularVelocity(ctx context.Context, extra map
 	// Primary failed, find a working sensor
 	lastWorking, err := ms.getLastWorkingBackup(ctx, extra)
 	if err != nil {
-		return spatialmath.AngularVelocity{}, fmt.Errorf("failed to get linear velocity: %w", err)
+		return spatialmath.AngularVelocity{}, fmt.Errorf("failed to get angular velocity: %w", err)
 	}
 
 	// get properties to determine if this API is supported on the next working backup.
@@ -283,15 +280,14 @@ func (ms *failoverMovementSensor) AngularVelocity(ctx context.Context, extra map
 		return spatialmath.AngularVelocity{}, err
 	}
 	if !props.LinearAccelerationSupported {
-		ms.logger.Warnf("next backup sensor %s does not support angular velocity", lastWorking.Name().ShortName())
-		return spatialmath.AngularVelocity{}, nil
+		return spatialmath.AngularVelocity{}, fmt.Errorf("next backup sensor %s does not support angular velocity", lastWorking.Name().ShortName())
 	}
 
 	// Read from the backups last working sensor.
 	// In the non-error case, the wrapper will never return its readings as nil.
 	reading, err := common.TryReadingOrFail(ctx, ms.timeout, lastWorking, angularVelocityWrapper, extra)
 	if err != nil {
-		return spatialmath.AngularVelocity{}, fmt.Errorf("all movement sensors failed to get angular velocity: %w", err)
+		return spatialmath.AngularVelocity{}, fmt.Errorf("failed to get angular velocity: %w", err)
 	}
 
 	vel, ok := reading.(spatialmath.AngularVelocity)
@@ -331,20 +327,19 @@ func (ms *failoverMovementSensor) LinearAcceleration(ctx context.Context, extra 
 		return r3.Vector{}, err
 	}
 	if !props.LinearAccelerationSupported {
-		ms.logger.Warnf("next backup sensor %s does not support linear acceleration", workingSensor.Name().ShortName())
-		return r3.Vector{}, nil
+		return r3.Vector{}, fmt.Errorf("next backup sensor %s does not support linear acceleration", workingSensor.Name().ShortName())
 	}
 
 	// Read from the backups last working sensor.
 	// In the non-error case, the wrapper will never return its readings as nil.
 	reading, err := common.TryReadingOrFail(ctx, ms.timeout, workingSensor, linearAccelerationWrapper, extra)
 	if err != nil {
-		return r3.Vector{}, fmt.Errorf("all movement sensors failed to get linear acceleration: %w", err)
+		return r3.Vector{}, fmt.Errorf("failed to get linear acceleration: %w", err)
 	}
 
 	acc, ok := reading.(r3.Vector)
 	if !ok {
-		return r3.Vector{}, errors.New("all movement sensors failed to get linear acceleration: type assertion failed")
+		return r3.Vector{}, errors.New("failed to get linear acceleration: type assertion failed")
 	}
 
 	return acc, nil
@@ -379,20 +374,19 @@ func (ms *failoverMovementSensor) CompassHeading(ctx context.Context, extra map[
 		return math.NaN(), err
 	}
 	if !props.CompassHeadingSupported {
-		ms.logger.Warnf("next backup sensor %s does not support compass heading", workingSensor.Name().ShortName())
-		return math.NaN(), nil
+		return math.NaN(), fmt.Errorf("next backup sensor %s does not support compass heading", workingSensor.Name().ShortName())
 	}
 
 	// Read from the backups last working sensor.
 	// In the non-error case, the wrapper will never return its readings as nil.
 	reading, err := common.TryReadingOrFail(ctx, ms.timeout, workingSensor, compassHeadingWrapper, extra)
 	if err != nil {
-		return math.NaN(), fmt.Errorf("all movement sensors failed to get compass heading %w", err)
+		return math.NaN(), fmt.Errorf("failed to get compass heading %w", err)
 	}
 
 	heading, ok := reading.(float64)
 	if !ok {
-		return math.NaN(), errors.New("all movement sensors failed to get compass heading: type assertion failed")
+		return math.NaN(), errors.New("failed to get compass heading: type assertion failed")
 	}
 
 	return heading, nil
@@ -426,20 +420,19 @@ func (ms *failoverMovementSensor) Orientation(ctx context.Context, extra map[str
 		return nil, err
 	}
 	if !props.OrientationSupported {
-		ms.logger.Warnf("next backup sensor %s does not support orientation", workingSensor.Name().ShortName())
-		return nil, nil
+		return nil, fmt.Errorf("next backup sensor %s does not support orientation", workingSensor.Name().ShortName())
 	}
 
 	// Read from the backups last working sensor.
 	// In the non-error case, the wrapper will never return its readings as nil.
 	reading, err := common.TryReadingOrFail(ctx, ms.timeout, workingSensor, orientationWrapper, extra)
 	if err != nil {
-		return nil, fmt.Errorf("all movement sensors failed to get orientation: %w", err)
+		return nil, fmt.Errorf("failed to get orientation: %w", err)
 	}
 
 	ori, ok := reading.(spatialmath.Orientation)
 	if !ok {
-		return nil, errors.New("all movement sensors failed to get orientation: type assertion failed")
+		return nil, errors.New("failed to get orientation: type assertion failed")
 	}
 
 	return ori, nil
@@ -448,7 +441,7 @@ func (ms *failoverMovementSensor) Orientation(ctx context.Context, extra map[str
 func (ms *failoverMovementSensor) Readings(ctx context.Context, extra map[string]any) (map[string]any, error) {
 	readings, err := getReading[map[string]any](ctx, ms, common.ReadingsWrapper, extra, ms.backup)
 	if err != nil {
-		return map[string]any{}, fmt.Errorf("all movement sensors failed to get readings: %w", err)
+		return map[string]any{}, fmt.Errorf("failed to get readings: %w", err)
 	}
 	return readings, nil
 }
@@ -457,14 +450,13 @@ func (ms *failoverMovementSensor) Accuracy(ctx context.Context, extra map[string
 ) {
 	acc, err := getReading[*movementsensor.Accuracy](ctx, ms, accuracyWrapper, extra, ms.backup)
 	if err != nil {
-		return nil, fmt.Errorf("all movement sensors failed to get accuracy: %w", err)
+		return nil, fmt.Errorf("failed to get accuracy: %w", err)
 	}
 	return acc, nil
 }
 
 func (ms *failoverMovementSensor) Properties(ctx context.Context, extra map[string]any) (*movementsensor.Properties, error) {
-	// reutrn the intersection of properties supported by primary and last working sensor
-
+	// reutrn the intersection of properties supported by primary and the last working sensor
 	lastWorkngSensorProps, err := ms.lastWorkingSensor.Properties(ctx, extra)
 	if err != nil {
 		return nil, err

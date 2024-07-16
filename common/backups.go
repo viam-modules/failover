@@ -20,7 +20,11 @@ type Backups struct {
 	callsMap map[resource.Sensor][]Call
 }
 
-func CreateBackup(timeout int, backupList []resource.Sensor, calls []func(context.Context, resource.Sensor, map[string]any) (any, error)) *Backups {
+func CreateBackup(timeout int,
+	backupList []resource.Sensor,
+	calls []func(context.Context, resource.Sensor,
+		map[string]any) (any, error),
+) *Backups {
 	backups := &Backups{
 		backupList:        backupList,
 		timeout:           timeout,
@@ -71,7 +75,6 @@ func (b *Backups) GetWorkingSensor(ctx context.Context, extra map[string]interfa
 	default:
 		return nil, fmt.Errorf("all %d backup sensors failed", len(b.backupList))
 	}
-
 }
 
 func (b *Backups) getLastWorkingSensor() resource.Sensor {
@@ -79,6 +82,7 @@ func (b *Backups) getLastWorkingSensor() resource.Sensor {
 	defer b.mu.Unlock()
 	return b.lastWorkingSensor
 }
+
 func (b *Backups) setLastWorkingSensor(sensor resource.Sensor) {
 	b.mu.Lock()
 	defer b.mu.Unlock()

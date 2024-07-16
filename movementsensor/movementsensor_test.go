@@ -10,13 +10,13 @@ import (
 
 	"github.com/golang/geo/r3"
 	geo "github.com/kellydunn/golang-geo"
-	"go.viam.com/test"
 
 	"go.viam.com/rdk/components/movementsensor"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/spatialmath"
 	"go.viam.com/rdk/testutils/inject"
+	"go.viam.com/test"
 )
 
 const (
@@ -319,7 +319,7 @@ func TestPosition(t *testing.T) {
 
 		if tc.expectErr {
 			test.That(t, err, test.ShouldNotBeNil)
-			test.That(t, err.Error(), test.ShouldContainSubstring, "all movement sensors failed to get position")
+			test.That(t, err.Error(), test.ShouldContainSubstring, "failed to get position")
 		} else {
 			test.That(t, err, test.ShouldBeNil)
 			test.That(t, pos, test.ShouldResemble, tc.expectedPos)
@@ -419,7 +419,7 @@ func TestLinearVelocity(t *testing.T) {
 
 		if tc.expectErr {
 			test.That(t, err, test.ShouldNotBeNil)
-			test.That(t, err.Error(), test.ShouldContainSubstring, "all movement sensors failed to get linear velocity")
+			test.That(t, err.Error(), test.ShouldContainSubstring, "failed to get linear velocity")
 		} else {
 			test.That(t, err, test.ShouldBeNil)
 			test.That(t, vel, test.ShouldResemble, tc.expectedRet)
@@ -518,7 +518,7 @@ func TestAngularVelocity(t *testing.T) {
 
 		if tc.expectErr {
 			test.That(t, err, test.ShouldNotBeNil)
-			test.That(t, err.Error(), test.ShouldContainSubstring, "all movement sensors failed to get angular velocity")
+			test.That(t, err.Error(), test.ShouldContainSubstring, "failed to get angular velocity")
 		} else {
 			test.That(t, err, test.ShouldBeNil)
 			test.That(t, val, test.ShouldResemble, tc.expectedRet)
@@ -617,7 +617,7 @@ func TestLinearAcceleration(t *testing.T) {
 
 		if tc.expectErr {
 			test.That(t, err, test.ShouldNotBeNil)
-			test.That(t, err.Error(), test.ShouldContainSubstring, "all movement sensors failed to get linear acceleration")
+			test.That(t, err.Error(), test.ShouldContainSubstring, "failed to get linear acceleration")
 		} else {
 			test.That(t, err, test.ShouldBeNil)
 			test.That(t, val, test.ShouldResemble, tc.expectedRet)
@@ -716,7 +716,7 @@ func TestOrientation(t *testing.T) {
 
 		if tc.expectErr {
 			test.That(t, err, test.ShouldNotBeNil)
-			test.That(t, err.Error(), test.ShouldContainSubstring, "all movement sensors failed to get orientation")
+			test.That(t, err.Error(), test.ShouldContainSubstring, "failed to get orientation")
 		} else {
 			test.That(t, err, test.ShouldBeNil)
 			test.That(t, val, test.ShouldResemble, tc.expectedRet)
@@ -815,7 +815,7 @@ func TestCompassHeading(t *testing.T) {
 
 		if tc.expectErr {
 			test.That(t, err, test.ShouldNotBeNil)
-			test.That(t, err.Error(), test.ShouldContainSubstring, "all movement sensors failed to get compass heading")
+			test.That(t, err.Error(), test.ShouldContainSubstring, "failed to get compass heading")
 		} else {
 			test.That(t, err, test.ShouldBeNil)
 			test.That(t, val, test.ShouldEqual, tc.expectedRet)
@@ -914,7 +914,7 @@ func TestAccuracy(t *testing.T) {
 
 		if tc.expectErr {
 			test.That(t, err, test.ShouldNotBeNil)
-			test.That(t, err.Error(), test.ShouldContainSubstring, "all movement sensors failed to get accuracy")
+			test.That(t, err.Error(), test.ShouldContainSubstring, "failed to get accuracy")
 		} else {
 			test.That(t, err, test.ShouldBeNil)
 			test.That(t, val, test.ShouldResemble, tc.expectedRet)
@@ -1013,7 +1013,7 @@ func TestReadings(t *testing.T) {
 
 		if tc.expectErr {
 			test.That(t, err, test.ShouldNotBeNil)
-			test.That(t, err.Error(), test.ShouldContainSubstring, "all movement sensors failed to get readings")
+			test.That(t, err.Error(), test.ShouldContainSubstring, "failed to get readings")
 		} else {
 			test.That(t, err, test.ShouldBeNil)
 			test.That(t, val, test.ShouldResemble, tc.expectedRet)

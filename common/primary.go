@@ -28,7 +28,8 @@ func CreatePrimary(ctx context.Context,
 	timeout int,
 	logger logging.Logger,
 	primarySensor resource.Sensor,
-	calls []func(context.Context, resource.Sensor, map[string]any) (any, error),
+	calls []func(context.Context,
+		resource.Sensor, map[string]any) (any, error),
 ) *Primary {
 	primary := &Primary{
 		workers:         rdkutils.NewStoppableWorkers(),
