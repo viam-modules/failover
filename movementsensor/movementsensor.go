@@ -193,12 +193,12 @@ func (ms *failoverMovementSensor) Position(ctx context.Context, extra map[string
 	// In the non-error case, the wrapper will never return its readings as nil.
 	reading, err := common.TryReadingOrFail(ctx, ms.timeout, movs, positionWrapper, extra)
 	if err != nil {
-		return nil, math.NaN(), fmt.Errorf("failed to get posiiton: %w", err)
+		return nil, math.NaN(), fmt.Errorf("failed to get position: %w", err)
 	}
 
 	pos, ok := reading.(positionVals)
 	if !ok {
-		return nil, math.NaN(), errors.New("failed to get postion: type assertion failed")
+		return nil, math.NaN(), errors.New("failed to get position: type assertion failed")
 	}
 	return pos.position, pos.altitiude, nil
 }
