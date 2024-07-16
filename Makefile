@@ -16,8 +16,6 @@ test:
 
 
 tool-install:
-	go mod download github.com/golangci/golangci-lint
-	go mod tidy
 	GOBIN=`pwd`/$(TOOL_BIN) go install \
 		github.com/golangci/golangci-lint/cmd/golangci-lint
 
