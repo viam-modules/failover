@@ -21,6 +21,7 @@ tool-install:
 
 
 lint: tool-install
+	go mod tidy
 	golangci-lint run -v --fix --config=./etc/.golangci.yaml
 
 
