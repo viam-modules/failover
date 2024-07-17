@@ -7,14 +7,12 @@ import (
 	failmovementsensor "failover/movementsensor"
 	failpowersensor "failover/powersensor"
 	failsensor "failover/sensor"
-
-	"go.viam.com/utils"
-
 	"go.viam.com/rdk/components/movementsensor"
 	"go.viam.com/rdk/components/powersensor"
 	"go.viam.com/rdk/components/sensor"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/module"
+	"go.viam.com/utils"
 )
 
 func main() {

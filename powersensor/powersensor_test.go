@@ -8,12 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"go.viam.com/test"
-
 	"go.viam.com/rdk/components/powersensor"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/testutils/inject"
+	"go.viam.com/test"
 )
 
 const (
@@ -53,7 +52,7 @@ func setup(t *testing.T) (testPowerSensors, resource.Dependencies) {
 	deps[powersensor.Named(backup1Name)] = powerSensors.backup1
 	deps[powersensor.Named(backup2Name)] = powerSensors.backup2
 
-	// Define defaults for the inject functions, these will be overriden in the tests.
+	// Define defaults for the inject functions, these will be overridden in the tests.
 	powerSensors.primary.VoltageFunc = func(ctx context.Context, extra map[string]any) (float64, bool, error) {
 		return 1, false, nil
 	}
@@ -144,7 +143,7 @@ func TestPower(t *testing.T) {
 	ctx := context.Background()
 	sensors, deps := setup(t)
 
-	var tests = []struct {
+	tests := []struct {
 		name string
 
 		primaryPower       float64
@@ -201,7 +200,6 @@ func TestPower(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-
 		goRoutinesStart := runtime.NumGoroutine()
 
 		sensors.primary.PowerFunc = func(ctx context.Context, extra map[string]any) (float64, error) {
@@ -236,7 +234,6 @@ func TestPower(t *testing.T) {
 		goRoutinesEnd := runtime.NumGoroutine()
 		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
 	}
-
 }
 
 func TestCurrent(t *testing.T) {
@@ -244,7 +241,7 @@ func TestCurrent(t *testing.T) {
 	ctx := context.Background()
 	sensors, deps := setup(t)
 
-	var tests = []struct {
+	tests := []struct {
 		name string
 
 		primaryCurrent     float64
@@ -335,7 +332,6 @@ func TestCurrent(t *testing.T) {
 		goRoutinesEnd := runtime.NumGoroutine()
 		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
 	}
-
 }
 
 func TestVoltage(t *testing.T) {
@@ -343,7 +339,7 @@ func TestVoltage(t *testing.T) {
 	ctx := context.Background()
 	sensors, deps := setup(t)
 
-	var tests = []struct {
+	tests := []struct {
 		name string
 
 		primaryVoltage     float64
@@ -436,7 +432,6 @@ func TestVoltage(t *testing.T) {
 		goRoutinesEnd := runtime.NumGoroutine()
 		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
 	}
-
 }
 
 func TestReadings(t *testing.T) {
@@ -444,7 +439,7 @@ func TestReadings(t *testing.T) {
 	ctx := context.Background()
 	sensors, deps := setup(t)
 
-	var tests = []struct {
+	tests := []struct {
 		name string
 
 		primaryReading     map[string]any
