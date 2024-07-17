@@ -13,9 +13,7 @@ import (
 	"go.viam.com/rdk/resource"
 )
 
-var (
-	Model = resource.NewModel("viam", "failover", "power_sensor")
-)
+var Model = resource.NewModel("viam", "failover", "power_sensor")
 
 func init() {
 	resource.RegisterComponent(powersensor.API, Model,
@@ -37,7 +35,11 @@ type failoverPowerSensor struct {
 	timeout int
 }
 
-func newFailoverPowerSensor(ctx context.Context, deps resource.Dependencies, conf resource.Config, logger logging.Logger) (powersensor.PowerSensor, error) {
+func newFailoverPowerSensor(ctx context.Context,
+	deps resource.Dependencies,
+	conf resource.Config,
+	logger logging.Logger,
+) (powersensor.PowerSensor, error) {
 	config, err := resource.NativeConfig[common.Config](conf)
 	if err != nil {
 		return nil, err
@@ -69,12 +71,13 @@ func newFailoverPowerSensor(ctx context.Context, deps resource.Dependencies, con
 		backups = append(backups, backup)
 	}
 
-	calls := []func(context.Context, resource.Sensor, map[string]any) (any, error){voltageWrapper, currentWrapper, powerWrapper, common.ReadingsWrapper}
+	calls := []func(context.Context, resource.Sensor, map[string]any) (any, error){
+		voltageWrapper, currentWrapper, powerWrapper, common.ReadingsWrapper,
+	}
 	ps.primary = common.CreatePrimary(ctx, ps.timeout, logger, primary, calls)
 	ps.backups = common.CreateBackup(ps.timeout, backups, calls)
 
 	return ps, nil
-
 }
 
 func (ps *failoverPowerSensor) Voltage(ctx context.Context, extra map[string]any) (float64, bool, error) {
@@ -107,7 +110,6 @@ func (ps *failoverPowerSensor) Voltage(ctx context.Context, extra map[string]any
 		return math.NaN(), false, errors.New("failed to get voltage: type assertion failed")
 	}
 	return vals.volts, vals.isAc, nil
-
 }
 
 // Current returns the current reading in amperes and a bool returning true if the current is AC.
@@ -120,7 +122,6 @@ func (ps *failoverPowerSensor) Current(ctx context.Context, extra map[string]any
 		if err == nil {
 			return readings.amps, readings.isAc, nil
 		}
-
 	}
 
 	// Primary failed, find a working sensor
@@ -205,10 +206,9 @@ func (ps *failoverPowerSensor) Readings(ctx context.Context, extra map[string]an
 		return nil, errors.New("failed to get readings: type assertion failed")
 	}
 	return reading, nil
-
 }
 
-func (s *failoverPowerSensor) Close(context.Context) error {
-	s.primary.Close()
+func (ps *failoverPowerSensor) Close(context.Context) error {
+	ps.primary.Close()
 	return nil
 }

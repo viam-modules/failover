@@ -1,3 +1,4 @@
+// Package movementsensor implements a failover movement sensor
 package movementsensor
 
 import (
@@ -5,7 +6,6 @@ import (
 
 	"github.com/golang/geo/r3"
 	geo "github.com/kellydunn/golang-geo"
-
 	"go.viam.com/rdk/components/movementsensor"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
@@ -55,7 +55,11 @@ type failovermovementsensor struct {
 	// resource.TriviallyCloseable
 }
 
-func newfailovermovementsensor(ctx context.Context, deps resource.Dependencies, rawConf resource.Config, logger logging.Logger) (movementsensor.MovementSensor, error) {
+func newfailovermovementsensor(ctx context.Context,
+	deps resource.Dependencies,
+	rawConf resource.Config,
+	logger logging.Logger,
+) (movementsensor.MovementSensor, error) {
 	conf, err := resource.NativeConfig[*Config](rawConf)
 	if err != nil {
 		return nil, err
