@@ -1,3 +1,4 @@
+// Package failoverpowersensor implements a failover power sensor.
 package failoverpowersensor
 
 import (

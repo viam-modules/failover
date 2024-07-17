@@ -4,11 +4,10 @@ package failoverpowersensor
 import (
 	"context"
 	"errors"
+	"failover/common"
 	"fmt"
 	"math"
 	"sync"
-
-	"failover/common"
 
 	"go.viam.com/rdk/components/powersensor"
 	"go.viam.com/rdk/logging"
@@ -37,9 +36,11 @@ type failoverPowerSensor struct {
 	timeout int
 }
 
-func newFailoverPowerSensor(ctx context.Context, deps resource.Dependencies, conf resource.Config, logger logging.Logger) (
-	powersensor.PowerSensor, error,
-) {
+func newFailoverPowerSensor(ctx context.Context,
+	deps resource.Dependencies,
+	conf resource.Config,
+	logger logging.Logger,
+) (powersensor.PowerSensor, error) {
 	config, err := resource.NativeConfig[common.Config](conf)
 	if err != nil {
 		return nil, err

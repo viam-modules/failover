@@ -1,4 +1,4 @@
-// Package common has all common functions
+// Package common contains all common functions
 package common
 
 import (
@@ -6,9 +6,8 @@ import (
 	"errors"
 	"time"
 
-	"go.viam.com/utils"
-
 	"go.viam.com/rdk/resource"
+	"go.viam.com/utils"
 )
 
 // Config is used for converting config attributes.
@@ -18,7 +17,7 @@ type Config struct {
 	Timeout int      `json:"timeout_ms,omitempty"`
 }
 
-// type call defines a general API call.
+// Call defines a general API call.
 type Call = func(context.Context, resource.Sensor, map[string]any) (any, error)
 
 // Validate performs config validation.
@@ -103,7 +102,7 @@ func TryReadingOrFail[K any](ctx context.Context,
 	}
 }
 
-// ReadingsWrapper wraps readings API.
+// ReadingsWrapper wraps Readings API.
 // Since all sensors implement readings we can reuse the same wrapper for all models.
 func ReadingsWrapper(ctx context.Context, s resource.Sensor, extra map[string]any) (any, error) {
 	readings, err := s.Readings(ctx, extra)

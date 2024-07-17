@@ -22,8 +22,7 @@ type Backups struct {
 
 func CreateBackup(timeout int,
 	backupList []resource.Sensor,
-	calls []func(context.Context, resource.Sensor,
-		map[string]any) (any, error),
+	calls []Call,
 ) *Backups {
 	backups := &Backups{
 		backupList:        backupList,
@@ -36,7 +35,6 @@ func CreateBackup(timeout int,
 }
 
 func (b *Backups) GetWorkingSensor(ctx context.Context, extra map[string]interface{}) (resource.Sensor, error) {
-
 	lastWorking := b.getLastWorkingSensor()
 
 	// Get the API calls the last working sensor supports.
