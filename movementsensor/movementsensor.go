@@ -4,10 +4,11 @@ package failovermovementsensor
 import (
 	"context"
 	"errors"
-	"failover/common"
 	"fmt"
 	"math"
 	"sync"
+
+	"failover/common"
 
 	"github.com/golang/geo/r3"
 	geo "github.com/kellydunn/golang-geo"
@@ -432,12 +433,11 @@ func (ms *failoverMovementSensor) Readings(ctx context.Context, extra map[string
 
 func (ms *failoverMovementSensor) Accuracy(ctx context.Context, extra map[string]any) (*movementsensor.Accuracy, error,
 ) {
-	// Accuracy is a special case - return the lastworkingsensor's accuracy whether it errors or not.
-	accuracy, err := ms.lastWorkingSensor.Accuracy(ctx, extra)
+	acc, err := getReading[*movementsensor.Accuracy](ctx, ms, accuracyWrapper, extra, ms.backup)
 	if err != nil {
-		return &movementsensor.Accuracy{}, fmt.Errorf("failed to get accuracy from last working sensor: %w", err)
+		return nil, fmt.Errorf("failed to get accuracy: %w", err)
 	}
-	return accuracy, nil
+	return acc, nil
 }
 
 func (ms *failoverMovementSensor) Properties(ctx context.Context, extra map[string]any) (*movementsensor.Properties, error) {
