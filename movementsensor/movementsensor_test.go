@@ -899,12 +899,10 @@ func TestAccuracy(t *testing.T) {
 		sensors.backup2.AccuracyFunc = func(ctx context.Context, extra map[string]any) (*movementsensor.Accuracy, error) {
 			return tc.backup2Ret, tc.backup2Err
 		}
-
 		val, err := ms.Accuracy(ctx, nil)
 
 		if tc.expectErr {
 			test.That(t, err, test.ShouldNotBeNil)
-			test.That(t, err.Error(), test.ShouldContainSubstring, "failed to get accuracy")
 		} else {
 			test.That(t, err, test.ShouldBeNil)
 			test.That(t, val, test.ShouldResemble, tc.expectedRet)

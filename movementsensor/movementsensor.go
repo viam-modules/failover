@@ -433,11 +433,12 @@ func (ms *failoverMovementSensor) Readings(ctx context.Context, extra map[string
 
 func (ms *failoverMovementSensor) Accuracy(ctx context.Context, extra map[string]any) (*movementsensor.Accuracy, error,
 ) {
-	acc, err := getReading[*movementsensor.Accuracy](ctx, ms, accuracyWrapper, extra, ms.backup)
+	// Accuracy is a special case - return the lastworkingsensor's accuracy whether it errors or not.
+	accuracy, err := ms.lastWorkingSensor.Accuracy(ctx, extra)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get accuracy: %w", err)
+		return &movementsensor.Accuracy{}, fmt.Errorf("failed to get accuracy from last working sensor: %w", err)
 	}
-	return acc, nil
+	return accuracy, nil
 }
 
 func (ms *failoverMovementSensor) Properties(ctx context.Context, extra map[string]any) (*movementsensor.Properties, error) {
