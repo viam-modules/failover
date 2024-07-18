@@ -1035,3 +1035,42 @@ func TestReadings(t *testing.T) {
 		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
 	}
 }
+
+// TestCreateCalls tests the createCalls helper function. It ensures the correct functions are added to the
+// list of functions that get called to check if the movement sensor is healthy.
+func TestCreateCalls(t *testing.T) {
+	ctx := context.Background()
+	sensors, _ := setup(t)
+
+	tests := []struct {
+		name          string
+		expectedCalls []common.Call
+		props         *movementsensor.Properties
+		accuracyErr   error
+	}{
+		{
+			name:          "Add all supported properties to the calls list",
+			props:         &movementsensor.Properties{LinearVelocitySupported: true, CompassHeadingSupported: true},
+			expectedCalls: []common.Call{common.ReadingsWrapper, linearVelocityWrapper, compassHeadingWrapper, accuracyWrapper},
+			accuracyErr:   nil,
+		},
+		{
+			name:          "if accuracy errors, do not add it to the calls list",
+			props:         &movementsensor.Properties{},
+			expectedCalls: []common.Call{common.ReadingsWrapper},
+			accuracyErr:   errors.ErrUnsupported,
+		},
+	}
+
+	for _, tc := range tests {
+		sensors.primary.AccuracyFunc = func(ctx context.Context, extra map[string]interface{}) (*movementsensor.Accuracy, error) {
+			return nil, tc.accuracyErr
+		}
+
+		calls := createCalls(ctx, sensors.primary, tc.props)
+
+		// ShouldResemble does not work with comparing functions, so comparing length instead.
+		test.That(t, len(calls), test.ShouldResemble, len(tc.expectedCalls))
+
+	}
+}

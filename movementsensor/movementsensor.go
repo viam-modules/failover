@@ -125,7 +125,7 @@ func createCalls(ctx context.Context, ms movementsensor.MovementSensor, props *m
 
 	// accuracy is not in properties - if it doesn't error add it to the calls list
 	_, err := ms.Accuracy(ctx, nil)
-	if err != nil {
+	if err == nil {
 		calls = append(calls, accuracyWrapper)
 	}
 
@@ -145,6 +145,7 @@ func createCalls(ctx context.Context, ms movementsensor.MovementSensor, props *m
 		calls = append(calls, angularVelocityWrapper)
 	}
 	if props.LinearAccelerationSupported {
+		fmt.Println("appending")
 		calls = append(calls, linearAccelerationWrapper)
 	}
 	return calls
