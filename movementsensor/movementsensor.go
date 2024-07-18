@@ -1,4 +1,4 @@
-// Package movementsensor implements movementsensor
+// Package failovermovementsensor implements a failover movement sensor
 package failovermovementsensor
 
 import (
@@ -78,7 +78,7 @@ func newFailoverMovementSensor(ctx context.Context, deps resource.Dependencies, 
 
 	s.primaryProps = primaryProps
 
-	supportedCalls := s.constructPrimary(ctx, primaryProps)
+	supportedCalls := s.constructPrimary(ctx)
 
 	// create list of backups for all APIs
 	backups := []resource.Sensor{}
@@ -103,9 +103,8 @@ func newFailoverMovementSensor(ctx context.Context, deps resource.Dependencies, 
 		}
 
 		backups = append(backups, backup)
-		calls := createCalls(ctx, backup, props)
+		calls := createCalls(props)
 		callsMap[backup] = calls
-
 	}
 
 	s.backup = common.CreateBackup(s.timeoutMs, backups, supportedCalls)
@@ -114,22 +113,15 @@ func newFailoverMovementSensor(ctx context.Context, deps resource.Dependencies, 
 	return s, nil
 }
 
-func (ms *failoverMovementSensor) constructPrimary(ctx context.Context, primaryProps *movementsensor.Properties) []common.Call {
-	calls := createCalls(ctx, ms.primaryMovementSensor, ms.primaryProps)
+func (ms *failoverMovementSensor) constructPrimary(ctx context.Context) []common.Call {
+	calls := createCalls(ms.primaryProps)
 	ms.primary = common.CreatePrimary(ctx, ms.timeoutMs, ms.logger, ms.primaryMovementSensor, calls)
 	return calls
 }
 
 // createCalls is a helper function to create a list of API calls supported from the properties.
-func createCalls(ctx context.Context, ms movementsensor.MovementSensor, props *movementsensor.Properties) []common.Call {
-	calls := []common.Call{common.ReadingsWrapper}
-
-	// accuracy is not in properties - if it doesn't error add it to the calls list
-	_, err := ms.Accuracy(ctx, nil)
-	if err != nil {
-		calls = append(calls, accuracyWrapper)
-	}
-
+func createCalls(props *movementsensor.Properties) []common.Call {
+	calls := []common.Call{common.ReadingsWrapper, accuracyWrapper}
 	if props.LinearVelocitySupported {
 		calls = append(calls, linearVelocityWrapper)
 	}
@@ -169,7 +161,7 @@ func (ms *failoverMovementSensor) Position(ctx context.Context, extra map[string
 
 	movs, err := ms.getLastWorkingBackup(ctx, extra)
 	if err != nil {
-		return nil, math.NaN(), fmt.Errorf("failed to get posiiton: %w", err)
+		return nil, math.NaN(), fmt.Errorf("failed to get position: %w", err)
 	}
 
 	// get properties to determine if this API is supported on the next working backup.
@@ -229,7 +221,6 @@ func (ms *failoverMovementSensor) LinearVelocity(ctx context.Context, extra map[
 	// In the non-error case, the wrapper will never return its readings as nil.
 	reading, err := common.TryReadingOrFail(ctx, ms.timeoutMs, workingSensor, linearVelocityWrapper, extra)
 	if err != nil {
-
 		return r3.Vector{}, nil
 	}
 
@@ -272,7 +263,8 @@ func (ms *failoverMovementSensor) AngularVelocity(ctx context.Context, extra map
 		return spatialmath.AngularVelocity{}, err
 	}
 	if !props.LinearAccelerationSupported {
-		return spatialmath.AngularVelocity{}, fmt.Errorf("next backup sensor %s does not support angular velocity", lastWorking.Name().ShortName())
+		return spatialmath.AngularVelocity{},
+			fmt.Errorf("next backup sensor %s does not support angular velocity", lastWorking.Name().ShortName())
 	}
 
 	// Read from the backups last working sensor.
@@ -287,7 +279,6 @@ func (ms *failoverMovementSensor) AngularVelocity(ctx context.Context, extra map
 		return spatialmath.AngularVelocity{}, errors.New("all movement sensors failed to get angular velocity: type assertion failed")
 	}
 	return vel, nil
-
 }
 
 func (ms *failoverMovementSensor) LinearAcceleration(ctx context.Context, extra map[string]any) (r3.Vector, error) {

@@ -10,7 +10,6 @@ import (
 
 	"github.com/golang/geo/r3"
 	geo "github.com/kellydunn/golang-geo"
-
 	"go.viam.com/rdk/components/movementsensor"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
@@ -215,7 +214,7 @@ func TestNewFailoverMovementSensor(t *testing.T) {
 				test.That(t, s.Name(), test.ShouldResemble, config.ResourceName())
 				fs := s.(*failoverMovementSensor)
 				test.That(t, fs.primary, test.ShouldNotBeNil)
-				test.That(t, fs.timeout, test.ShouldEqual, 1)
+				test.That(t, fs.timeoutMs, test.ShouldEqual, 1)
 			}
 		})
 	}
