@@ -1050,22 +1050,12 @@ func TestCreateCalls(t *testing.T) {
 		{
 			name:          "Add all supported properties to the calls list",
 			props:         &movementsensor.Properties{LinearVelocitySupported: true, CompassHeadingSupported: true},
-			expectedCalls: []common.Call{common.ReadingsWrapper, linearVelocityWrapper, compassHeadingWrapper, accuracyWrapper},
+			expectedCalls: []common.Call{common.ReadingsWrapper, linearVelocityWrapper, compassHeadingWrapper},
 			accuracyErr:   nil,
-		},
-		{
-			name:          "if accuracy errors, do not add it to the calls list",
-			props:         &movementsensor.Properties{},
-			expectedCalls: []common.Call{common.ReadingsWrapper},
-			accuracyErr:   errors.ErrUnsupported,
 		},
 	}
 
 	for _, tc := range tests {
-		sensors.primary.AccuracyFunc = func(ctx context.Context, extra map[string]interface{}) (*movementsensor.Accuracy, error) {
-			return nil, tc.accuracyErr
-		}
-
 		calls := createCalls(ctx, sensors.primary, tc.props)
 
 		// ShouldResemble does not work with comparing functions, so comparing length instead.
