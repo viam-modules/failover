@@ -6,9 +6,8 @@ import (
 	"errors"
 	"time"
 
-	"go.viam.com/utils"
-
 	"go.viam.com/rdk/resource"
+	"go.viam.com/utils"
 )
 
 // Config is used for converting config attributes.
