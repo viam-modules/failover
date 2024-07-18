@@ -75,7 +75,6 @@ func getReading[K any](ctx context.Context,
 		readings: reading,
 		err:      err,
 	}
-
 }
 
 // TryReadingOrFail will call the inputted API and either error, timeout, or return the reading.
@@ -87,6 +86,7 @@ func TryReadingOrFail[K any](ctx context.Context,
 	K, error,
 ) {
 	cancelCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	resultChan := make(chan ReadingsResult)
 	var zero K
 	go func() {
@@ -99,7 +99,6 @@ func TryReadingOrFail[K any](ctx context.Context,
 	select {
 	case <-time.After(time.Duration(timeout) * time.Millisecond):
 		// timed out - cancel the context given to the API call and return
-		cancel()
 		return zero, errors.New("sensor timed out")
 	case result := <-resultChan:
 		if result.err != nil {
