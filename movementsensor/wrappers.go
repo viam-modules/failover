@@ -103,17 +103,3 @@ func orientationWrapper(ctx context.Context, s resource.Sensor, extra map[string
 	}
 	return orientation, nil
 }
-
-func accuracyWrapper(ctx context.Context, s resource.Sensor, extra map[string]interface{}) (any, error,
-) {
-	ms, ok := s.(movementsensor.MovementSensor)
-	if !ok {
-		return &movementsensor.Accuracy{}, errors.New("type assertion to movement sensor failed")
-	}
-
-	accuracy, err := ms.Accuracy(ctx, extra)
-	if err != nil {
-		return &movementsensor.Accuracy{}, err
-	}
-	return accuracy, nil
-}

@@ -4,11 +4,11 @@ package failoverpowersensor
 import (
 	"context"
 	"errors"
-	"failover/common"
 	"fmt"
 	"math"
 	"sync"
 
+	"failover/common"
 	"go.viam.com/rdk/components/powersensor"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"

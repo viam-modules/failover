@@ -10,14 +10,13 @@ import (
 
 	"github.com/golang/geo/r3"
 	geo "github.com/kellydunn/golang-geo"
-	"go.viam.com/test"
-	"go.viam.com/utils"
-
 	"go.viam.com/rdk/components/movementsensor"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/spatialmath"
 	"go.viam.com/rdk/testutils/inject"
+	"go.viam.com/test"
+	"go.viam.com/utils"
 )
 
 const (
@@ -844,58 +843,41 @@ func TestAccuracy(t *testing.T) {
 	tests := []struct {
 		name string
 
-		primaryRet         *movementsensor.Accuracy
-		backup1Ret         *movementsensor.Accuracy
-		backup2Ret         *movementsensor.Accuracy
-		expectedRet        *movementsensor.Accuracy
-		primaryErr         error
-		backup1Err         error
-		backup2Err         error
-		expectErr          bool
-		primaryTimeSeconds int
+		primaryRet    *movementsensor.Accuracy
+		backup1Ret    *movementsensor.Accuracy
+		backup2Ret    *movementsensor.Accuracy
+		expectedRet   *movementsensor.Accuracy
+		primaryErr    error
+		backup1Err    error
+		backup2Err    error
+		expectErr     bool
+		workingSensor movementsensor.MovementSensor
 	}{
 		{
-			name:        "if the primary succeeds, should return primary reading",
-			primaryRet:  &movementsensor.Accuracy{NmeaFix: 2},
-			backup1Ret:  &movementsensor.Accuracy{NmeaFix: 3},
-			backup2Ret:  &movementsensor.Accuracy{NmeaFix: 4},
-			expectedRet: &movementsensor.Accuracy{NmeaFix: 2},
-			expectErr:   false,
+			name:          "should return last working sensor accuracy",
+			primaryRet:    &movementsensor.Accuracy{NmeaFix: 2},
+			backup1Ret:    &movementsensor.Accuracy{NmeaFix: 3},
+			backup2Ret:    &movementsensor.Accuracy{NmeaFix: 4},
+			expectedRet:   &movementsensor.Accuracy{NmeaFix: 2},
+			workingSensor: sensors.primary,
+			expectErr:     false,
 		},
 		{
-			name:        "if the primary fails, backup1 is returned",
-			primaryRet:  &movementsensor.Accuracy{NmeaFix: 2},
-			backup1Ret:  &movementsensor.Accuracy{NmeaFix: 3},
-			backup2Ret:  &movementsensor.Accuracy{NmeaFix: 4},
-			expectedRet: &movementsensor.Accuracy{NmeaFix: 3},
-			expectErr:   false,
-			primaryErr:  errTest,
+			name:          "should return last working sensor accuracy",
+			primaryRet:    &movementsensor.Accuracy{NmeaFix: 2},
+			backup1Ret:    &movementsensor.Accuracy{NmeaFix: 3},
+			backup2Ret:    &movementsensor.Accuracy{NmeaFix: 4},
+			expectedRet:   &movementsensor.Accuracy{NmeaFix: 3},
+			workingSensor: sensors.backup1,
+			expectErr:     false,
 		},
 		{
-			name:        "if primary and backup1 fail, backup2 is returned",
-			primaryErr:  errTest,
-			backup1Err:  errTest,
-			primaryRet:  &movementsensor.Accuracy{NmeaFix: 2},
-			backup1Ret:  &movementsensor.Accuracy{NmeaFix: 3},
-			backup2Ret:  &movementsensor.Accuracy{NmeaFix: 4},
-			expectedRet: &movementsensor.Accuracy{NmeaFix: 4},
-			expectErr:   false,
-		},
-		{
-			name:               "a reading should timeout after default of 1 second",
-			primaryTimeSeconds: 1,
-			primaryRet:         &movementsensor.Accuracy{NmeaFix: 2},
-			backup1Ret:         &movementsensor.Accuracy{NmeaFix: 3},
-			backup2Ret:         &movementsensor.Accuracy{NmeaFix: 4},
-			expectedRet:        &movementsensor.Accuracy{NmeaFix: 3},
-			expectErr:          false,
-		},
-		{
-			name:       "if all sensors error, return error",
-			primaryErr: errTest,
-			backup1Err: errTest,
-			backup2Err: errTest,
-			expectErr:  true,
+			name:          "if the last working sensor errors, return error",
+			primaryErr:    errTest,
+			backup1Ret:    &movementsensor.Accuracy{NmeaFix: 3},
+			backup2Ret:    &movementsensor.Accuracy{NmeaFix: 4},
+			workingSensor: sensors.primary,
+			expectErr:     true,
 		},
 	}
 
@@ -903,11 +885,10 @@ func TestAccuracy(t *testing.T) {
 		goRoutinesStart := runtime.NumGoroutine()
 		ms, err := newFailoverMovementSensor(ctx, deps, config, logger)
 		test.That(t, err, test.ShouldBeNil)
+		mov := ms.(*failoverMovementSensor)
+		mov.lastWorkingSensor = tc.workingSensor
 
 		sensors.primary.AccuracyFunc = func(ctx context.Context, extra map[string]any) (*movementsensor.Accuracy, error) {
-			if !utils.SelectContextOrWait(ctx, time.Duration(tc.primaryTimeSeconds)*time.Second) {
-				return &movementsensor.Accuracy{}, errors.New("timed out")
-			}
 			return tc.primaryRet, tc.primaryErr
 		}
 
@@ -918,12 +899,10 @@ func TestAccuracy(t *testing.T) {
 		sensors.backup2.AccuracyFunc = func(ctx context.Context, extra map[string]any) (*movementsensor.Accuracy, error) {
 			return tc.backup2Ret, tc.backup2Err
 		}
-
 		val, err := ms.Accuracy(ctx, nil)
 
 		if tc.expectErr {
 			test.That(t, err, test.ShouldNotBeNil)
-			test.That(t, err.Error(), test.ShouldContainSubstring, "failed to get accuracy")
 		} else {
 			test.That(t, err, test.ShouldBeNil)
 			test.That(t, val, test.ShouldResemble, tc.expectedRet)
@@ -1033,5 +1012,30 @@ func TestReadings(t *testing.T) {
 		test.That(t, err, test.ShouldBeNil)
 		goRoutinesEnd := runtime.NumGoroutine()
 		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
+	}
+}
+
+// TestCreateCalls tests the createCalls helper function. It ensures the correct functions are added to the
+// list of functions that get called to check if the movement sensor is healthy.
+func TestCreateCalls(t *testing.T) {
+	tests := []struct {
+		name          string
+		expectedCalls []common.Call
+		props         *movementsensor.Properties
+		accuracyErr   error
+	}{
+		{
+			name:          "Add all supported properties to the calls list",
+			props:         &movementsensor.Properties{LinearVelocitySupported: true, CompassHeadingSupported: true},
+			expectedCalls: []common.Call{common.ReadingsWrapper, linearVelocityWrapper, compassHeadingWrapper},
+			accuracyErr:   nil,
+		},
+	}
+
+	for _, tc := range tests {
+		calls := createCalls(tc.props)
+
+		// ShouldResemble does not work with comparing functions, so comparing length instead.
+		test.That(t, len(calls), test.ShouldResemble, len(tc.expectedCalls))
 	}
 }
