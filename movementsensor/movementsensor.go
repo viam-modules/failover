@@ -145,7 +145,6 @@ func createCalls(ctx context.Context, ms movementsensor.MovementSensor, props *m
 		calls = append(calls, angularVelocityWrapper)
 	}
 	if props.LinearAccelerationSupported {
-		fmt.Println("appending")
 		calls = append(calls, linearAccelerationWrapper)
 	}
 	return calls
