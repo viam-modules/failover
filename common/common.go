@@ -98,7 +98,7 @@ func TryReadingOrFail[K any](ctx context.Context,
 	}()
 	select {
 	case <-time.After(time.Duration(timeout) * time.Millisecond):
-		// timed out - cancel the context given to the API call and return
+		// timed out - the context passed into the API call will be canceled on return.
 		return zero, errors.New("sensor timed out")
 	case result := <-resultChan:
 		if result.err != nil {
