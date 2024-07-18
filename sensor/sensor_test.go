@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"go.viam.com/utils"
+
 	"go.viam.com/rdk/components/sensor"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
@@ -214,7 +216,9 @@ func TestReadings(t *testing.T) {
 		goRoutinesStart := runtime.NumGoroutine()
 
 		sensors.primary.ReadingsFunc = func(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
-			time.Sleep(time.Duration(tc.primaryTimeSeconds) * time.Second)
+			if !utils.SelectContextOrWait(ctx, time.Duration(tc.primaryTimeSeconds)*time.Second) {
+				return nil, errors.New("timed out")
+			}
 			return tc.primaryReading, tc.primaryErr
 		}
 
@@ -240,8 +244,7 @@ func TestReadings(t *testing.T) {
 
 		err = s.Close(ctx)
 		test.That(t, err, test.ShouldBeNil)
-		time.Sleep(1 * time.Second)
-		// Check how many routines are still running to ensure there are no leaks from sensor.
+		// Check how many routines are still running to ensure there are no leaks from power sensor.
 		goRoutinesEnd := runtime.NumGoroutine()
 		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
 	}
