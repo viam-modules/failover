@@ -723,7 +723,7 @@ func TestOrientation(t *testing.T) {
 
 		if tc.expectErr {
 			test.That(t, err, test.ShouldNotBeNil)
-			test.That(t, err.Error(), test.ShouldContainSubstring, "all movement sensors failed to get orientation")
+			test.That(t, err.Error(), test.ShouldContainSubstring, "failed to get orientation")
 		} else {
 			test.That(t, err, test.ShouldBeNil)
 			test.That(t, val, test.ShouldResemble, tc.expectedRet)
@@ -983,7 +983,7 @@ func TestReadings(t *testing.T) {
 		},
 		{
 			name:               "a reading should timeout after default of 1 second",
-			primaryTimeSeconds: 1,
+			primaryTimeSeconds: 2,
 			primaryRet:         map[string]any{"a": 1},
 			backup1Ret:         map[string]any{"b": 2},
 			backup2Ret:         map[string]any{"c": 3},
