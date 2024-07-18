@@ -1036,7 +1036,7 @@ func TestCreateCalls(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		calls := createCalls(ctx, sensors.primary, tc.props)
+		calls := createCalls(tc.props)
 
 		// ShouldResemble does not work with comparing functions, so comparing length instead.
 		test.That(t, len(calls), test.ShouldResemble, len(tc.expectedCalls))

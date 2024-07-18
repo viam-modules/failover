@@ -104,7 +104,7 @@ func newFailoverMovementSensor(ctx context.Context, deps resource.Dependencies, 
 		}
 
 		backups = append(backups, backup)
-		calls := createCalls(ctx, backup, props)
+		calls := createCalls(props)
 		callsMap[backup] = calls
 	}
 
@@ -115,13 +115,13 @@ func newFailoverMovementSensor(ctx context.Context, deps resource.Dependencies, 
 }
 
 func (ms *failoverMovementSensor) constructPrimary(ctx context.Context) []common.Call {
-	calls := createCalls(ctx, ms.primaryMovementSensor, ms.primaryProps)
+	calls := createCalls(ms.primaryProps)
 	ms.primary = common.CreatePrimary(ctx, ms.timeoutMs, ms.logger, ms.primaryMovementSensor, calls)
 	return calls
 }
 
 // createCalls is a helper function to create a list of API calls supported from the properties.
-func createCalls(ctx context.Context, ms movementsensor.MovementSensor, props *movementsensor.Properties) []common.Call {
+func createCalls(props *movementsensor.Properties) []common.Call {
 	calls := []common.Call{common.ReadingsWrapper}
 
 	if props.LinearVelocitySupported {
