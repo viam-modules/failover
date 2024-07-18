@@ -10,14 +10,13 @@ import (
 
 	"github.com/golang/geo/r3"
 	geo "github.com/kellydunn/golang-geo"
-	"go.viam.com/test"
-	"go.viam.com/utils"
-
 	"go.viam.com/rdk/components/movementsensor"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/spatialmath"
 	"go.viam.com/rdk/testutils/inject"
+	"go.viam.com/test"
+	"go.viam.com/utils"
 )
 
 const (
@@ -1071,6 +1070,5 @@ func TestCreateCalls(t *testing.T) {
 
 		// ShouldResemble does not work with comparing functions, so comparing length instead.
 		test.That(t, len(calls), test.ShouldResemble, len(tc.expectedCalls))
-
 	}
 }
