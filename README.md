@@ -14,7 +14,7 @@ The following attributes are available for all failover models:
 
 ## Example configurations
 
-###`viam:failover:sensor`
+### `viam:failover:sensor`
 ```json
   {
       "name": "my-failover-sensor",

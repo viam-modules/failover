@@ -85,13 +85,20 @@ func TryReadingOrFail[K any](ctx context.Context,
 	extra map[string]any) (
 	K, error,
 ) {
-	resultChan := make(chan ReadingsResult, 1)
+	cancelCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	resultChan := make(chan ReadingsResult)
 	var zero K
 	go func() {
-		resultChan <- getReading(ctx, call, s, extra)
+		select {
+		case <-cancelCtx.Done():
+			return
+		case resultChan <- getReading(cancelCtx, call, s, extra):
+		}
 	}()
 	select {
 	case <-time.After(time.Duration(timeout) * time.Millisecond):
+		// timed out - the context passed into the API call will be canceled on return.
 		return zero, errors.New("sensor timed out")
 	case result := <-resultChan:
 		if result.err != nil {
