@@ -1018,8 +1018,6 @@ func TestReadings(t *testing.T) {
 // TestCreateCalls tests the createCalls helper function. It ensures the correct functions are added to the
 // list of functions that get called to check if the movement sensor is healthy.
 func TestCreateCalls(t *testing.T) {
-	ctx := context.Background()
-	sensors, _ := setup(t)
 
 	tests := []struct {
 		name          string
