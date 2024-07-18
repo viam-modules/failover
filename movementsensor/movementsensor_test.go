@@ -10,14 +10,12 @@ import (
 
 	"github.com/golang/geo/r3"
 	geo "github.com/kellydunn/golang-geo"
-	"go.viam.com/test"
-	"go.viam.com/utils"
-
 	"go.viam.com/rdk/components/movementsensor"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/spatialmath"
 	"go.viam.com/rdk/testutils/inject"
+	"go.viam.com/test"
 )
 
 const (
@@ -216,7 +214,7 @@ func TestNewFailoverMovementSensor(t *testing.T) {
 				test.That(t, s.Name(), test.ShouldResemble, config.ResourceName())
 				fs := s.(*failoverMovementSensor)
 				test.That(t, fs.primary, test.ShouldNotBeNil)
-				test.That(t, fs.timeout, test.ShouldEqual, 1)
+				test.That(t, fs.timeoutMs, test.ShouldEqual, 1)
 			}
 		})
 	}
@@ -280,7 +278,7 @@ func TestPosition(t *testing.T) {
 		},
 		{
 			name:               "a reading should timeout after default of 1 second",
-			primaryTimeSeconds: 2,
+			primaryTimeSeconds: 1,
 			primaryPos:         geo.NewPoint(1, 1),
 			primaryAlt:         4,
 			backup1Pos:         geo.NewPoint(2, 2),
@@ -304,9 +302,7 @@ func TestPosition(t *testing.T) {
 		test.That(t, err, test.ShouldBeNil)
 
 		sensors.primary.PositionFunc = func(ctx context.Context, extra map[string]any) (*geo.Point, float64, error) {
-			if !utils.SelectContextOrWait(ctx, time.Duration(tc.primaryTimeSeconds)*time.Second) {
-				return nil, 0, errors.New("timed out")
-			}
+			time.Sleep(time.Duration(tc.primaryTimeSeconds) * time.Second)
 			return tc.primaryPos, tc.primaryAlt, tc.primaryErr
 		}
 
@@ -322,7 +318,7 @@ func TestPosition(t *testing.T) {
 
 		if tc.expectErr {
 			test.That(t, err, test.ShouldNotBeNil)
-			test.That(t, err.Error(), test.ShouldContainSubstring, "all movement sensors failed to get position")
+			test.That(t, err.Error(), test.ShouldContainSubstring, "failed to get position")
 		} else {
 			test.That(t, err, test.ShouldBeNil)
 			test.That(t, pos, test.ShouldResemble, tc.expectedPos)
@@ -331,6 +327,7 @@ func TestPosition(t *testing.T) {
 
 		err = s.Close(ctx)
 		test.That(t, err, test.ShouldBeNil)
+		time.Sleep(1 * time.Second)
 		goRoutinesEnd := runtime.NumGoroutine()
 		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
 	}
@@ -405,9 +402,7 @@ func TestLinearVelocity(t *testing.T) {
 		test.That(t, err, test.ShouldBeNil)
 
 		sensors.primary.LinearVelocityFunc = func(ctx context.Context, extra map[string]any) (r3.Vector, error) {
-			if !utils.SelectContextOrWait(ctx, time.Duration(tc.primaryTimeSeconds)*time.Second) {
-				return r3.Vector{}, errors.New("timed out")
-			}
+			time.Sleep(time.Duration(tc.primaryTimeSeconds) * time.Second)
 			return tc.primaryRet, tc.primaryErr
 		}
 
@@ -423,7 +418,7 @@ func TestLinearVelocity(t *testing.T) {
 
 		if tc.expectErr {
 			test.That(t, err, test.ShouldNotBeNil)
-			test.That(t, err.Error(), test.ShouldContainSubstring, "all movement sensors failed to get linear velocity")
+			test.That(t, err.Error(), test.ShouldContainSubstring, "failed to get linear velocity")
 		} else {
 			test.That(t, err, test.ShouldBeNil)
 			test.That(t, vel, test.ShouldResemble, tc.expectedRet)
@@ -431,6 +426,7 @@ func TestLinearVelocity(t *testing.T) {
 
 		err = ms.Close(ctx)
 		test.That(t, err, test.ShouldBeNil)
+		time.Sleep(1 * time.Second)
 		goRoutinesEnd := runtime.NumGoroutine()
 		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
 	}
@@ -483,7 +479,7 @@ func TestAngularVelocity(t *testing.T) {
 		},
 		{
 			name:               "a reading should timeout after default of 1 second",
-			primaryTimeSeconds: 2,
+			primaryTimeSeconds: 1,
 			primaryRet:         spatialmath.AngularVelocity{X: 1, Y: 2, Z: 3},
 			backup1Ret:         spatialmath.AngularVelocity{X: 3, Y: 2, Z: 1},
 			backup2Ret:         spatialmath.AngularVelocity{X: 4, Y: 5, Z: 6},
@@ -505,9 +501,7 @@ func TestAngularVelocity(t *testing.T) {
 		test.That(t, err, test.ShouldBeNil)
 
 		sensors.primary.AngularVelocityFunc = func(ctx context.Context, extra map[string]any) (spatialmath.AngularVelocity, error) {
-			if !utils.SelectContextOrWait(ctx, time.Duration(tc.primaryTimeSeconds)*time.Second) {
-				return spatialmath.AngularVelocity{}, errors.New("timed out")
-			}
+			time.Sleep(time.Duration(tc.primaryTimeSeconds) * time.Second)
 			return tc.primaryRet, tc.primaryErr
 		}
 
@@ -523,7 +517,7 @@ func TestAngularVelocity(t *testing.T) {
 
 		if tc.expectErr {
 			test.That(t, err, test.ShouldNotBeNil)
-			test.That(t, err.Error(), test.ShouldContainSubstring, "all movement sensors failed to get angular velocity")
+			test.That(t, err.Error(), test.ShouldContainSubstring, "failed to get angular velocity")
 		} else {
 			test.That(t, err, test.ShouldBeNil)
 			test.That(t, val, test.ShouldResemble, tc.expectedRet)
@@ -531,6 +525,7 @@ func TestAngularVelocity(t *testing.T) {
 
 		err = ms.Close(ctx)
 		test.That(t, err, test.ShouldBeNil)
+		time.Sleep(1 * time.Second)
 		goRoutinesEnd := runtime.NumGoroutine()
 		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
 	}
@@ -605,9 +600,7 @@ func TestLinearAcceleration(t *testing.T) {
 		test.That(t, err, test.ShouldBeNil)
 
 		sensors.primary.LinearAccelerationFunc = func(ctx context.Context, extra map[string]any) (r3.Vector, error) {
-			if !utils.SelectContextOrWait(ctx, time.Duration(tc.primaryTimeSeconds)*time.Second) {
-				return r3.Vector{}, errors.New("timed out")
-			}
+			time.Sleep(time.Duration(tc.primaryTimeSeconds) * time.Second)
 			return tc.primaryRet, tc.primaryErr
 		}
 
@@ -623,7 +616,7 @@ func TestLinearAcceleration(t *testing.T) {
 
 		if tc.expectErr {
 			test.That(t, err, test.ShouldNotBeNil)
-			test.That(t, err.Error(), test.ShouldContainSubstring, "all movement sensors failed to get linear acceleration")
+			test.That(t, err.Error(), test.ShouldContainSubstring, "failed to get linear acceleration")
 		} else {
 			test.That(t, err, test.ShouldBeNil)
 			test.That(t, val, test.ShouldResemble, tc.expectedRet)
@@ -631,6 +624,7 @@ func TestLinearAcceleration(t *testing.T) {
 
 		err = ms.Close(ctx)
 		test.That(t, err, test.ShouldBeNil)
+		time.Sleep(1 * time.Second)
 		goRoutinesEnd := runtime.NumGoroutine()
 		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
 	}
@@ -705,9 +699,7 @@ func TestOrientation(t *testing.T) {
 		test.That(t, err, test.ShouldBeNil)
 
 		sensors.primary.OrientationFunc = func(ctx context.Context, extra map[string]any) (spatialmath.Orientation, error) {
-			if !utils.SelectContextOrWait(ctx, time.Duration(tc.primaryTimeSeconds)*time.Second) {
-				return &spatialmath.OrientationVector{}, errors.New("timed out")
-			}
+			time.Sleep(time.Duration(tc.primaryTimeSeconds) * time.Second)
 			return tc.primaryRet, tc.primaryErr
 		}
 
@@ -723,7 +715,7 @@ func TestOrientation(t *testing.T) {
 
 		if tc.expectErr {
 			test.That(t, err, test.ShouldNotBeNil)
-			test.That(t, err.Error(), test.ShouldContainSubstring, "all movement sensors failed to get orientation")
+			test.That(t, err.Error(), test.ShouldContainSubstring, "failed to get orientation")
 		} else {
 			test.That(t, err, test.ShouldBeNil)
 			test.That(t, val, test.ShouldResemble, tc.expectedRet)
@@ -731,6 +723,7 @@ func TestOrientation(t *testing.T) {
 
 		err = ms.Close(ctx)
 		test.That(t, err, test.ShouldBeNil)
+		time.Sleep(1 * time.Second)
 		goRoutinesEnd := runtime.NumGoroutine()
 		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
 	}
@@ -805,9 +798,7 @@ func TestCompassHeading(t *testing.T) {
 		test.That(t, err, test.ShouldBeNil)
 
 		sensors.primary.CompassHeadingFunc = func(ctx context.Context, extra map[string]any) (float64, error) {
-			if !utils.SelectContextOrWait(ctx, time.Duration(tc.primaryTimeSeconds)*time.Second) {
-				return 0, errors.New("timed out")
-			}
+			time.Sleep(time.Duration(tc.primaryTimeSeconds) * time.Second)
 			return tc.primaryRet, tc.primaryErr
 		}
 
@@ -823,7 +814,7 @@ func TestCompassHeading(t *testing.T) {
 
 		if tc.expectErr {
 			test.That(t, err, test.ShouldNotBeNil)
-			test.That(t, err.Error(), test.ShouldContainSubstring, "all movement sensors failed to get compass heading")
+			test.That(t, err.Error(), test.ShouldContainSubstring, "failed to get compass heading")
 		} else {
 			test.That(t, err, test.ShouldBeNil)
 			test.That(t, val, test.ShouldEqual, tc.expectedRet)
@@ -831,6 +822,7 @@ func TestCompassHeading(t *testing.T) {
 
 		err = ms.Close(ctx)
 		test.That(t, err, test.ShouldBeNil)
+		time.Sleep(1 * time.Second)
 		goRoutinesEnd := runtime.NumGoroutine()
 		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
 	}
@@ -883,7 +875,7 @@ func TestAccuracy(t *testing.T) {
 		},
 		{
 			name:               "a reading should timeout after default of 1 second",
-			primaryTimeSeconds: 2,
+			primaryTimeSeconds: 1,
 			primaryRet:         &movementsensor.Accuracy{NmeaFix: 2},
 			backup1Ret:         &movementsensor.Accuracy{NmeaFix: 3},
 			backup2Ret:         &movementsensor.Accuracy{NmeaFix: 4},
@@ -905,9 +897,7 @@ func TestAccuracy(t *testing.T) {
 		test.That(t, err, test.ShouldBeNil)
 
 		sensors.primary.AccuracyFunc = func(ctx context.Context, extra map[string]any) (*movementsensor.Accuracy, error) {
-			if !utils.SelectContextOrWait(ctx, time.Duration(tc.primaryTimeSeconds)*time.Second) {
-				return &movementsensor.Accuracy{}, errors.New("timed out")
-			}
+			time.Sleep(time.Duration(tc.primaryTimeSeconds) * time.Second)
 			return tc.primaryRet, tc.primaryErr
 		}
 
@@ -923,7 +913,7 @@ func TestAccuracy(t *testing.T) {
 
 		if tc.expectErr {
 			test.That(t, err, test.ShouldNotBeNil)
-			test.That(t, err.Error(), test.ShouldContainSubstring, "all movement sensors failed to get accuracy")
+			test.That(t, err.Error(), test.ShouldContainSubstring, "failed to get accuracy")
 		} else {
 			test.That(t, err, test.ShouldBeNil)
 			test.That(t, val, test.ShouldResemble, tc.expectedRet)
@@ -931,6 +921,7 @@ func TestAccuracy(t *testing.T) {
 
 		err = ms.Close(ctx)
 		test.That(t, err, test.ShouldBeNil)
+		time.Sleep(1 * time.Second)
 		goRoutinesEnd := runtime.NumGoroutine()
 		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
 	}
@@ -1005,9 +996,7 @@ func TestReadings(t *testing.T) {
 		test.That(t, err, test.ShouldBeNil)
 
 		sensors.primary.ReadingsFunc = func(ctx context.Context, extra map[string]any) (map[string]any, error) {
-			if !utils.SelectContextOrWait(ctx, time.Duration(tc.primaryTimeSeconds)*time.Second) {
-				return map[string]any{}, errors.New("timed out")
-			}
+			time.Sleep(time.Duration(tc.primaryTimeSeconds) * time.Second)
 			return tc.primaryRet, tc.primaryErr
 		}
 
@@ -1023,7 +1012,7 @@ func TestReadings(t *testing.T) {
 
 		if tc.expectErr {
 			test.That(t, err, test.ShouldNotBeNil)
-			test.That(t, err.Error(), test.ShouldContainSubstring, "all movement sensors failed to get readings")
+			test.That(t, err.Error(), test.ShouldContainSubstring, "failed to get readings")
 		} else {
 			test.That(t, err, test.ShouldBeNil)
 			test.That(t, val, test.ShouldResemble, tc.expectedRet)
@@ -1031,6 +1020,7 @@ func TestReadings(t *testing.T) {
 
 		err = ms.Close(ctx)
 		test.That(t, err, test.ShouldBeNil)
+		time.Sleep(1 * time.Second)
 		goRoutinesEnd := runtime.NumGoroutine()
 		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
 	}

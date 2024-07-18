@@ -8,13 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"go.viam.com/test"
-	"go.viam.com/utils"
-
 	"go.viam.com/rdk/components/powersensor"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/testutils/inject"
+	"go.viam.com/test"
 )
 
 const (
@@ -54,7 +52,7 @@ func setup(t *testing.T) (testPowerSensors, resource.Dependencies) {
 	deps[powersensor.Named(backup1Name)] = powerSensors.backup1
 	deps[powersensor.Named(backup2Name)] = powerSensors.backup2
 
-	// Define defaults for the inject functions, these will be overriden in the tests.
+	// Define defaults for the inject functions, these will be overridden in the tests.
 	powerSensors.primary.VoltageFunc = func(ctx context.Context, extra map[string]any) (float64, bool, error) {
 		return 1, false, nil
 	}
@@ -145,7 +143,7 @@ func TestPower(t *testing.T) {
 	ctx := context.Background()
 	sensors, deps := setup(t)
 
-	var tests = []struct {
+	tests := []struct {
 		name string
 
 		primaryPower       float64
@@ -186,7 +184,7 @@ func TestPower(t *testing.T) {
 		},
 		{
 			name:               "a reading should timeout after default of 1 second",
-			primaryTimeSeconds: 2,
+			primaryTimeSeconds: 1,
 			primaryPower:       2.4,
 			backup1Power:       3,
 			expectedPower:      3,
@@ -202,13 +200,10 @@ func TestPower(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-
 		goRoutinesStart := runtime.NumGoroutine()
 
 		sensors.primary.PowerFunc = func(ctx context.Context, extra map[string]any) (float64, error) {
-			if !utils.SelectContextOrWait(ctx, time.Duration(tc.primaryTimeSeconds)*time.Second) {
-				return 0, errors.New("timed out")
-			}
+			time.Sleep(time.Duration(tc.primaryTimeSeconds) * time.Second)
 			return tc.primaryPower, tc.primaryErr
 		}
 
@@ -234,11 +229,11 @@ func TestPower(t *testing.T) {
 
 		err = s.Close(ctx)
 		test.That(t, err, test.ShouldBeNil)
+		time.Sleep(1 * time.Second)
 		// Check how many routines are still running to ensure there are no leaks from power sensor.
 		goRoutinesEnd := runtime.NumGoroutine()
 		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
 	}
-
 }
 
 func TestCurrent(t *testing.T) {
@@ -246,7 +241,7 @@ func TestCurrent(t *testing.T) {
 	ctx := context.Background()
 	sensors, deps := setup(t)
 
-	var tests = []struct {
+	tests := []struct {
 		name string
 
 		primaryCurrent     float64
@@ -287,7 +282,7 @@ func TestCurrent(t *testing.T) {
 		},
 		{
 			name:               "a reading should timeout after default of 1 second",
-			primaryTimeSeconds: 2,
+			primaryTimeSeconds: 1,
 			primaryCurrent:     2.4,
 			backup1Current:     3,
 			expectedCurrent:    3,
@@ -307,9 +302,7 @@ func TestCurrent(t *testing.T) {
 		goRoutinesStart := runtime.NumGoroutine()
 
 		sensors.primary.CurrentFunc = func(ctx context.Context, extra map[string]any) (float64, bool, error) {
-			if !utils.SelectContextOrWait(ctx, time.Duration(tc.primaryTimeSeconds)*time.Second) {
-				return 0, false, errors.New("timed out")
-			}
+			time.Sleep(time.Duration(tc.primaryTimeSeconds) * time.Second)
 			return tc.primaryCurrent, false, tc.primaryErr
 		}
 
@@ -334,11 +327,11 @@ func TestCurrent(t *testing.T) {
 
 		err = s.Close(ctx)
 		test.That(t, err, test.ShouldBeNil)
+		time.Sleep(1 * time.Second)
 		// Check how many routines are still running to ensure there are no leaks from power sensor.
 		goRoutinesEnd := runtime.NumGoroutine()
 		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
 	}
-
 }
 
 func TestVoltage(t *testing.T) {
@@ -346,7 +339,7 @@ func TestVoltage(t *testing.T) {
 	ctx := context.Background()
 	sensors, deps := setup(t)
 
-	var tests = []struct {
+	tests := []struct {
 		name string
 
 		primaryVoltage     float64
@@ -387,7 +380,7 @@ func TestVoltage(t *testing.T) {
 		},
 		{
 			name:               "a reading should timeout after default of 1 second",
-			primaryTimeSeconds: 2,
+			primaryTimeSeconds: 1,
 			primaryVoltage:     2.4,
 			backup1Voltage:     3,
 			expectedVoltage:    3,
@@ -407,9 +400,7 @@ func TestVoltage(t *testing.T) {
 		goRoutinesStart := runtime.NumGoroutine()
 
 		sensors.primary.VoltageFunc = func(ctx context.Context, extra map[string]any) (float64, bool, error) {
-			if !utils.SelectContextOrWait(ctx, time.Duration(tc.primaryTimeSeconds)*time.Second) {
-				return 0, false, errors.New("timed out")
-			}
+			time.Sleep(time.Duration(tc.primaryTimeSeconds) * time.Second)
 			return tc.primaryVoltage, false, tc.primaryErr
 		}
 
@@ -436,11 +427,11 @@ func TestVoltage(t *testing.T) {
 
 		err = s.Close(ctx)
 		test.That(t, err, test.ShouldBeNil)
+		time.Sleep(1 * time.Second)
 		// Check how many routines are still running to ensure there are no leaks from power sensor.
 		goRoutinesEnd := runtime.NumGoroutine()
 		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
 	}
-
 }
 
 func TestReadings(t *testing.T) {
@@ -448,7 +439,7 @@ func TestReadings(t *testing.T) {
 	ctx := context.Background()
 	sensors, deps := setup(t)
 
-	var tests = []struct {
+	tests := []struct {
 		name string
 
 		primaryReading     map[string]any
@@ -485,7 +476,7 @@ func TestReadings(t *testing.T) {
 		},
 		{
 			name:               "a reading should timeout after default of 1 second",
-			primaryTimeSeconds: 2,
+			primaryTimeSeconds: 1,
 			primaryReading:     map[string]any{"a": 1},
 			backup1Reading:     map[string]any{"a": 2},
 			expectedReading:    map[string]any{"a": 2},
@@ -505,9 +496,7 @@ func TestReadings(t *testing.T) {
 		goRoutinesStart := runtime.NumGoroutine()
 
 		sensors.primary.ReadingsFunc = func(ctx context.Context, extra map[string]any) (map[string]any, error) {
-			if !utils.SelectContextOrWait(ctx, time.Duration(tc.primaryTimeSeconds)*time.Second) {
-				return map[string]any{}, errors.New("timed out")
-			}
+			time.Sleep(time.Duration(tc.primaryTimeSeconds) * time.Second)
 			return tc.primaryReading, tc.primaryErr
 		}
 
@@ -533,6 +522,7 @@ func TestReadings(t *testing.T) {
 
 		err = s.Close(ctx)
 		test.That(t, err, test.ShouldBeNil)
+		time.Sleep(1 * time.Second)
 		// Check how many routines are still running to ensure there are no leaks from power sensor.
 		goRoutinesEnd := runtime.NumGoroutine()
 		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)

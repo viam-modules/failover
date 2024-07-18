@@ -4,19 +4,16 @@ package failoversensor
 import (
 	"context"
 	"errors"
-	"fmt"
-
 	"failover/common"
+	"fmt"
 
 	"go.viam.com/rdk/components/sensor"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 )
 
-var (
-	// Model defines triplet name.
-	Model = resource.NewModel("viam", "failover", "sensor")
-)
+// Model defines triplet name.
+var Model = resource.NewModel("viam", "failover", "sensor")
 
 func init() {
 	resource.RegisterComponent(sensor.API, Model,
@@ -59,7 +56,7 @@ func newFailoverSensor(ctx context.Context, deps resource.Dependencies, conf res
 		backups = append(backups, backup)
 	}
 
-	calls := []func(context.Context, resource.Sensor, map[string]any) (any, error){common.ReadingsWrapper}
+	calls := []common.Call{common.ReadingsWrapper}
 
 	s.primary = common.CreatePrimary(ctx, s.timeout, logger, primary, calls)
 	s.backups = common.CreateBackup(s.timeout, backups, calls)
@@ -78,7 +75,6 @@ type failoverSensor struct {
 }
 
 func (s *failoverSensor) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
-
 	// If UsePrimary flag is set, call readings on primary sensor and return if no error.
 	if s.primary.UsePrimary() {
 		readings, err := common.TryPrimary[map[string]any](ctx, s.primary, extra, common.ReadingsWrapper)

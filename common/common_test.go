@@ -8,7 +8,6 @@ import (
 )
 
 func TestValidate(t *testing.T) {
-
 	tests := []struct {
 		name        string
 		cfg         *Config
@@ -50,7 +49,6 @@ func TestValidate(t *testing.T) {
 				test.That(t, err, test.ShouldBeNil)
 				test.That(t, deps, test.ShouldNotBeNil)
 			}
-
 		})
 	}
 }

@@ -1,10 +1,9 @@
-// package common
+// Package common contains all common functions
 package common
 
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"go.viam.com/rdk/resource"
@@ -17,6 +16,9 @@ type Config struct {
 	Backups []string `json:"backups"`
 	Timeout int      `json:"timeout_ms,omitempty"`
 }
+
+// Call defines a general API call.
+type Call = func(context.Context, resource.Sensor, map[string]any) (any, error)
 
 // Validate performs config validation.
 func (cfg Config) Validate(path string) ([]string, error) {
@@ -36,7 +38,12 @@ func (cfg Config) Validate(path string) ([]string, error) {
 }
 
 // CallAllFunctions is a helper to call all the inputted functions and return if one errors.
-func CallAllFunctions(ctx context.Context, s resource.Sensor, timeout int, extra map[string]interface{}, calls []func(context.Context, resource.Sensor, map[string]any) (any, error)) error {
+func CallAllFunctions(ctx context.Context,
+	s resource.Sensor,
+	timeout int,
+	extra map[string]interface{},
+	calls []Call,
+) error {
 	for _, call := range calls {
 		_, err := TryReadingOrFail(ctx, timeout, s, call, extra)
 		// one of them errored, return
@@ -45,9 +52,9 @@ func CallAllFunctions(ctx context.Context, s resource.Sensor, timeout int, extra
 		}
 	}
 	return nil
-
 }
 
+// ReadingsResult struct to return readings and error
 // Go does not allow channels containing a tuple,
 // so defining the struct with readings and error
 // to send through a channel.
@@ -57,19 +64,21 @@ type ReadingsResult struct {
 }
 
 // getReading calls the inputted API call and returns the reading and error as a ReadingsResult struct.
-func getReading[K any](ctx context.Context, call func(context.Context, resource.Sensor, map[string]any) (K, error), s resource.Sensor, extra map[string]any) ReadingsResult {
+func getReading[K any](ctx context.Context,
+	call func(context.Context, resource.Sensor, map[string]any) (K, error),
+	s resource.Sensor,
+	extra map[string]any,
+) ReadingsResult {
 	reading, err := call(ctx, s, extra)
 
-	result := ReadingsResult{
+	return ReadingsResult{
 		readings: reading,
 		err:      err,
 	}
 
-	return result
-
 }
 
-// TryReadingorFail will call the inputted API and either error, timeout, or return the reading.
+// TryReadingOrFail will call the inputted API and either error, timeout, or return the reading.
 func TryReadingOrFail[K any](ctx context.Context,
 	timeout int,
 	s resource.Sensor,
@@ -94,13 +103,14 @@ func TryReadingOrFail[K any](ctx context.Context,
 		return zero, errors.New("sensor timed out")
 	case result := <-resultChan:
 		if result.err != nil {
-			return zero, fmt.Errorf("failed to get readings: %w", result.err)
+			return zero, result.err
 		} else {
 			return result.readings.(K), nil
 		}
 	}
 }
 
+// ReadingsWrapper wraps Readings API.
 // Since all sensors implement readings we can reuse the same wrapper for all models.
 func ReadingsWrapper(ctx context.Context, s resource.Sensor, extra map[string]any) (any, error) {
 	readings, err := s.Readings(ctx, extra)

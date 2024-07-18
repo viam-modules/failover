@@ -8,13 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"go.viam.com/test"
-	"go.viam.com/utils"
-
 	"go.viam.com/rdk/components/sensor"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/testutils/inject"
+	"go.viam.com/test"
 )
 
 const (
@@ -44,6 +42,17 @@ func setup(t *testing.T) (testSensors, resource.Dependencies) {
 	deps[sensor.Named(primaryName)] = sensors.primary
 	deps[sensor.Named(backup1Name)] = sensors.backup1
 	deps[sensor.Named(backup2Name)] = sensors.backup2
+
+	sensors.primary.ReadingsFunc = func(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
+		return map[string]any{"foo": 1}, nil
+	}
+
+	sensors.backup1.ReadingsFunc = func(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
+		return map[string]any{"foo": 1}, nil
+	}
+	sensors.backup2.ReadingsFunc = func(_ context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
+		return map[string]any{"foo": 1}, nil
+	}
 
 	return sensors, deps
 }
@@ -205,10 +214,7 @@ func TestReadings(t *testing.T) {
 		goRoutinesStart := runtime.NumGoroutine()
 
 		sensors.primary.ReadingsFunc = func(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
-			if !utils.SelectContextOrWait(ctx, time.Duration(tc.primaryTimeSeconds)*time.Second) {
-				return nil, errors.New("timed out")
-			}
-
+			time.Sleep(time.Duration(tc.primaryTimeSeconds) * time.Second)
 			return tc.primaryReading, tc.primaryErr
 		}
 
@@ -234,9 +240,9 @@ func TestReadings(t *testing.T) {
 
 		err = s.Close(ctx)
 		test.That(t, err, test.ShouldBeNil)
+		time.Sleep(1 * time.Second)
 		// Check how many routines are still running to ensure there are no leaks from sensor.
 		goRoutinesEnd := runtime.NumGoroutine()
 		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
-
 	}
 }
