@@ -4,7 +4,6 @@ package common
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"go.viam.com/rdk/resource"
@@ -17,6 +16,9 @@ type Config struct {
 	Backups []string `json:"backups"`
 	Timeout int      `json:"timeout_ms,omitempty"`
 }
+
+// Call defines a general API call.
+type Call = func(context.Context, resource.Sensor, map[string]any) (any, error)
 
 // Validate performs config validation.
 func (cfg Config) Validate(path string) ([]string, error) {
@@ -40,7 +42,7 @@ func CallAllFunctions(ctx context.Context,
 	s resource.Sensor,
 	timeout int,
 	extra map[string]interface{},
-	calls []func(context.Context, resource.Sensor, map[string]any) (any, error),
+	calls []Call,
 ) error {
 	for _, call := range calls {
 		_, err := TryReadingOrFail(ctx, timeout, s, call, extra)
@@ -93,7 +95,7 @@ func TryReadingOrFail[K any](ctx context.Context,
 		return zero, errors.New("sensor timed out")
 	case result := <-resultChan:
 		if result.err != nil {
-			return zero, fmt.Errorf("failed to get readings: %w", result.err)
+			return zero, result.err
 		} else {
 			return result.readings.(K), nil
 		}

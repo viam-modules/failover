@@ -4,9 +4,9 @@ package failoversensor
 import (
 	"context"
 	"errors"
+	"failover/common"
 	"fmt"
 
-	"failover/common"
 	"go.viam.com/rdk/components/sensor"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
@@ -56,7 +56,7 @@ func newFailoverSensor(ctx context.Context, deps resource.Dependencies, conf res
 		backups = append(backups, backup)
 	}
 
-	calls := []func(context.Context, resource.Sensor, map[string]any) (any, error){common.ReadingsWrapper}
+	calls := []common.Call{common.ReadingsWrapper}
 
 	s.primary = common.CreatePrimary(ctx, s.timeout, logger, primary, calls)
 	s.backups = common.CreateBackup(s.timeout, backups, calls)

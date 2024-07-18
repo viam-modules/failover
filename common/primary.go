@@ -21,14 +21,14 @@ type Primary struct {
 	mu         sync.Mutex
 	usePrimary bool
 
-	calls []func(context.Context, resource.Sensor, map[string]any) (any, error)
+	calls []Call
 }
 
 func CreatePrimary(ctx context.Context,
 	timeout int,
 	logger logging.Logger,
 	primarySensor resource.Sensor,
-	calls []func(context.Context, resource.Sensor, map[string]any) (any, error),
+	calls []Call,
 ) *Primary {
 	primary := &Primary{
 		workers:         rdkutils.NewStoppableWorkers(),
@@ -76,7 +76,7 @@ func (p *Primary) TryAllReadings(ctx context.Context) {
 func TryPrimary[T any](ctx context.Context,
 	s *Primary,
 	extra map[string]any,
-	call func(context.Context, resource.Sensor, map[string]any) (any, error),
+	call Call,
 ) (T, error) {
 	readings, err := TryReadingOrFail(ctx, s.timeout, s.primarySensor, call, extra)
 	if err == nil {
@@ -98,8 +98,8 @@ func TryPrimary[T any](ctx context.Context,
 // Then, it calls all APIs on the primary sensor until they are all successful and updates the
 // UsePrimary flag.
 func (p *Primary) PollPrimaryForHealth() {
-	// poll every 10 ms.
-	ticker := time.NewTicker(time.Millisecond * 10)
+	// poll every 100 ms.
+	ticker := time.NewTicker(time.Millisecond * 100)
 	p.workers.AddWorkers(func(ctx context.Context) {
 		for {
 			select {

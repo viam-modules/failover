@@ -10,8 +10,9 @@ import (
 	"go.viam.com/rdk/resource"
 )
 
-// Wrapping all of powersensor APIs to return one struct containing their return values.
-// These wrappers can used as parameters in the generic helper functions.
+// Wrapping all of powersensor APIs to return one struct containing their return values as any.
+// These wrappers can be used as parameters in the generic helper functions.
+// All wrapper functions must return any to store them in the backups struct.
 
 type voltageVals struct {
 	volts float64
