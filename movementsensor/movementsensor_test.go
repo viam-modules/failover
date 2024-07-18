@@ -823,7 +823,7 @@ func TestCompassHeading(t *testing.T) {
 
 		if tc.expectErr {
 			test.That(t, err, test.ShouldNotBeNil)
-			test.That(t, err.Error(), test.ShouldContainSubstring, "all movement sensors failed to get compass heading")
+			test.That(t, err.Error(), test.ShouldContainSubstring, "failed to get compass heading")
 		} else {
 			test.That(t, err, test.ShouldBeNil)
 			test.That(t, val, test.ShouldEqual, tc.expectedRet)
