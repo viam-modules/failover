@@ -3,6 +3,7 @@ package failoverpowersensor
 import (
 	"context"
 	"errors"
+	"failover/common"
 	"runtime"
 	"testing"
 	"time"
