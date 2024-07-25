@@ -20,7 +20,7 @@ The following attributes are available for all failover models:
       "name": "my-failover-sensor",
       "model": "viam:failover:sensor",
       "type": "sensor",
-      "namespace": "viam",
+      "namespace": "rdk",
       "attributes": {
         "primary": "sensor-primary",
         "backups": [
@@ -38,7 +38,7 @@ The following attributes are available for all failover models:
       "name": "my-failover-power-sensor",
       "model": "viam:failover:power_sensor",
       "type": "power_sensor",
-      "namespace": "viam",
+      "namespace": "rdk",
       "attributes": {
         "primary": "primary-ps",
         "backups": [
@@ -54,7 +54,7 @@ The following attributes are available for all failover models:
       "name": "my-failover-movement-sensor",
       "model": "viam:failover:movement_sensor",
       "type": "movement_sensor",
-      "namespace": "viam",
+      "namespace": "rdk",
       "attributes": {
         "primary": "primary-ms",
         "backups": [
