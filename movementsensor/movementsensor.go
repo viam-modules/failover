@@ -99,7 +99,7 @@ func newFailoverMovementSensor(ctx context.Context, deps resource.Dependencies, 
 			continue
 		}
 
-		if primaryProps != props {
+		if *primaryProps != *props {
 			s.logger.Infof("backup %s has different properties than primary - consider using a merged movement sensor", backup.Name().ShortName())
 		}
 
