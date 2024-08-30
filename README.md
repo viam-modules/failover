@@ -1,6 +1,6 @@
 # [`failover` module](<https://github.com/viam-modules/failover>)
 
-This implements the [`rdk:component:sensor` API](https://docs.viam.com/components/sensor/#api), [`rdk:component:movement_sensor` API](https://docs.viam.com/components/movement-sensor/#api), and [`rdk:component:power_sensor` API](https://docs.viam.com/components/power-sensor/#api) in `failover` models, which allow you to designate a primary component to serve as the sensor and backup components in case of failure.
+The `failover` module provides sensor models which allow you to designate a primary sensor and backup sensors in case of failure. The models implement the [`rdk:component:sensor` API](https://docs.viam.com/components/sensor/#api), [`rdk:component:movement_sensor` API](https://docs.viam.com/components/movement-sensor/#api), and [`rdk:component:power_sensor` API](https://docs.viam.com/components/power-sensor/#api) respectively.
 It supports sensor, power sensor, or movement sensor models as the primary and backup components, depending on the model you configure.
 
 ## Configure your `failover` sensor
