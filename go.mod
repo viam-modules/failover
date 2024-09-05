@@ -1,6 +1,6 @@
 module failover
 
-go 1.21.10
+go 1.21.13
 
 require (
 	github.com/edaniels/golinters v0.0.5-0.20220906153528-641155550742
