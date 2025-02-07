@@ -57,7 +57,7 @@ The following attributes are available for all `failover` models:
 ```
 
 
-### `viam:failover:power_sensor` <br>
+### `viam:failover:power_sensor`
 ```json
   {
       "name": "my-failover-power-sensor",
