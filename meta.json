@@ -8,19 +8,19 @@
     {
       "api": "rdk:component:sensor",
       "model": "viam:failover:sensor",
-      "markdown_link": "README.md#viamfailoversensor",
+      "markdown_link": "README.md#configure-your-failover-sensor",
       "short_description": "a failover sensor model"
     },
     {
       "api": "rdk:component:power_sensor",
       "model": "viam:failover:power_sensor",
-       "markdown_link": "README.md#viamfailoverpower_sensor",
+       "markdown_link": "README.md#configure-your-failover-sensor",
       "short_description": "a failover power sensor model"
     },
     {
       "api": "rdk:component:movement_sensor",
       "model": "viam:failover:movement_sensor",
-      "markdown_link": "README.md#viamfailovermovement_sensor",
+      "markdown_link": "README.md#configure-your-failover-sensor",
       "short_description": "a failover power sensor model"
     }
   ],

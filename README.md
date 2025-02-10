@@ -3,13 +3,13 @@
 The `failover` module provides sensor models which allow you to designate a primary sensor and backup sensors in case of failure. The models implement the [`rdk:component:sensor` API](https://docs.viam.com/components/sensor/#api), [`rdk:component:movement_sensor` API](https://docs.viam.com/components/movement-sensor/#api), and [`rdk:component:power_sensor` API](https://docs.viam.com/components/power-sensor/#api) respectively.
 It supports sensor, power sensor, or movement sensor models as the primary and backup components, depending on the model you configure.
 
-## Configure your `failover` sensor
-
 > [!NOTE]
 > Before configuring your sensor, you must [create a machine](https://docs.viam.com/cloud/machines/#add-a-new-machine).
 
 Navigate to the **CONFIGURE** tab of your machine’s page in [the Viam app](https://app.viam.com/).
 [Add `sensor` / `failover:sensor`, `sensor` / `failover:movement_sensor`, or `sensor` / `failover:power_sensor` to your machine](https://docs.viam.com/configure/#components).
+
+## Configure your `failover` sensor
 
 On the new component panel, copy and paste the following attribute template into your sensor's attributes field:
 
@@ -25,9 +25,6 @@ On the new component panel, copy and paste the following attribute template into
 
 Edit the attributes as applicable to the sensors you have configured.
 
-> [!NOTE]
-> For more information, see [Configure a Machine](https://docs.viam.com/configure/).
-
 ### Attributes
 
 The following attributes are available for all `failover` models:
@@ -37,7 +34,7 @@ The following attributes are available for all `failover` models:
 | `primary` | string | **Required** | Name of the primary component. |
 | `backups` | string array | **Required** | List of backups to use if the primary component fails. The order in the array corresponds to the order they will be used in. |
 
-## Example configurations:
+## Example configurations
 
 ### `viam:failover:sensor`
 ```json
