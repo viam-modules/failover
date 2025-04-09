@@ -3,18 +3,18 @@ package failoversensor
 import (
 	"context"
 	"errors"
-	"failover/common"
 	"runtime"
 	"testing"
 	"time"
 
-	"go.viam.com/utils"
+	"failover/common"
 
 	"go.viam.com/rdk/components/sensor"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/testutils/inject"
 	"go.viam.com/test"
+	"go.viam.com/utils"
 )
 
 const (

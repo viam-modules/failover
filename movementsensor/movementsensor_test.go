@@ -3,11 +3,11 @@ package failovermovementsensor
 import (
 	"context"
 	"errors"
-	"failover/common"
 	"runtime"
 	"testing"
 	"time"
 
+	"failover/common"
 	"github.com/golang/geo/r3"
 	geo "github.com/kellydunn/golang-geo"
 	"go.viam.com/rdk/components/movementsensor"

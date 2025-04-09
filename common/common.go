@@ -4,6 +4,7 @@ package common
 import (
 	"context"
 	"errors"
+	"reflect"
 	"time"
 
 	"go.viam.com/rdk/resource"
@@ -12,7 +13,7 @@ import (
 
 // Config is used for converting config attributes.
 type Config struct {
-	Primary string   `json:"primary"`
+	Primary string   `json:"primary,omitempty"`
 	Backups []string `json:"backups"`
 	Timeout int      `json:"timeout_ms,omitempty"`
 }
@@ -20,13 +21,15 @@ type Config struct {
 // Call defines a general API call.
 type Call = func(context.Context, resource.Sensor, map[string]any) (any, error)
 
+// NoReadings is the return for a sensor that has not received data.
+var NoReadings = map[string]interface{}{"": "no readings available yet"}
+
 // Validate performs config validation.
 func (cfg Config) Validate(path string) ([]string, error) {
 	var deps []string
-	if cfg.Primary == "" {
-		return nil, utils.NewConfigValidationFieldRequiredError(path, "primary")
+	if cfg.Primary != "" {
+		deps = append(deps, cfg.Primary)
 	}
-	deps = append(deps, cfg.Primary)
 
 	if len(cfg.Backups) == 0 {
 		return nil, utils.NewConfigValidationFieldRequiredError(path, "backups")
@@ -101,11 +104,17 @@ func TryReadingOrFail[K any](ctx context.Context,
 		// timed out - the context passed into the API call will be canceled on return.
 		return zero, errors.New("sensor timed out")
 	case result := <-resultChan:
+		readings, ok := result.readings.(K)
+		if !ok {
+			return zero, errors.New("readings is unexpected type")
+		}
 		if result.err != nil {
 			return zero, result.err
-		} else {
-			return result.readings.(K), nil
 		}
+		if reflect.DeepEqual(readings, NoReadings) {
+			return zero, errors.New("returned no readings")
+		}
+		return readings, nil
 	}
 }
 
