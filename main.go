@@ -7,6 +7,7 @@ import (
 	failmovementsensor "failover/movementsensor"
 	failpowersensor "failover/powersensor"
 	failsensor "failover/sensor"
+
 	"go.viam.com/rdk/components/movementsensor"
 	"go.viam.com/rdk/components/powersensor"
 	"go.viam.com/rdk/components/sensor"
@@ -20,7 +21,7 @@ func main() {
 }
 
 func mainWithArgs(ctx context.Context, args []string, logger logging.Logger) error {
-	failover, err := module.NewModuleFromArgs(ctx, logger)
+	failover, err := module.NewModuleFromArgs(ctx)
 	if err != nil {
 		return err
 	}

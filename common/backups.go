@@ -92,3 +92,21 @@ func (b *Backups) SetCallsMap(callsMap map[resource.Sensor][]Call) {
 	defer b.mu.Unlock()
 	b.callsMap = callsMap
 }
+
+// GetSensors returns the list of backup sensors
+func (b *Backups) GetSensors() []resource.Sensor {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.backupList
+}
+
+// TryReading attempts to get readings from a specific sensor
+func (b *Backups) TryReading(ctx context.Context, sensor resource.Sensor, extra map[string]interface{}) error {
+	var calls []Call
+	if b.callsMap != nil {
+		calls = b.callsMap[sensor]
+	} else {
+		calls = b.calls
+	}
+	return CallAllFunctions(ctx, sensor, b.timeout, extra, calls)
+}
