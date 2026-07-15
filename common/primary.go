@@ -7,12 +7,12 @@ import (
 
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
-	rdkutils "go.viam.com/rdk/utils"
+	viamutils "go.viam.com/utils"
 )
 
 // Primary defines the primary sensor for the failover.
 type Primary struct {
-	workers         rdkutils.StoppableWorkers
+	workers         *viamutils.StoppableWorkers
 	logger          logging.Logger
 	primarySensor   resource.Sensor
 	pollPrimaryChan chan bool
@@ -31,7 +31,7 @@ func CreatePrimary(ctx context.Context,
 	calls []Call,
 ) *Primary {
 	primary := &Primary{
-		workers:         rdkutils.NewStoppableWorkers(),
+		workers:         viamutils.NewBackgroundStoppableWorkers(),
 		pollPrimaryChan: make(chan bool),
 		usePrimary:      true,
 		timeout:         timeout,
@@ -100,7 +100,7 @@ func TryPrimary[T any](ctx context.Context,
 func (p *Primary) PollPrimaryForHealth() {
 	// poll every 100 ms.
 	ticker := time.NewTicker(time.Millisecond * 100)
-	p.workers.AddWorkers(func(ctx context.Context) {
+	p.workers.Add(func(ctx context.Context) {
 		for {
 			select {
 			// wait for data to come into the channel before polling.

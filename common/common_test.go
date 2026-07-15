@@ -41,7 +41,7 @@ func TestValidate(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			deps, err := tc.cfg.Validate("path")
+			deps, _, err := tc.cfg.Validate("path")
 			if tc.expectedErr != nil {
 				test.That(t, deps, test.ShouldBeNil)
 				test.That(t, err.Error(), test.ShouldResemble, tc.expectedErr.Error())

@@ -21,20 +21,20 @@ type Config struct {
 type Call = func(context.Context, resource.Sensor, map[string]any) (any, error)
 
 // Validate performs config validation.
-func (cfg Config) Validate(path string) ([]string, error) {
+func (cfg Config) Validate(path string) ([]string, []string, error) {
 	var deps []string
 	if cfg.Primary == "" {
-		return nil, utils.NewConfigValidationFieldRequiredError(path, "primary")
+		return nil, nil, utils.NewConfigValidationFieldRequiredError(path, "primary")
 	}
 	deps = append(deps, cfg.Primary)
 
 	if len(cfg.Backups) == 0 {
-		return nil, utils.NewConfigValidationFieldRequiredError(path, "backups")
+		return nil, nil, utils.NewConfigValidationFieldRequiredError(path, "backups")
 	}
 
 	deps = append(deps, cfg.Backups...)
 
-	return deps, nil
+	return deps, nil, nil
 }
 
 // CallAllFunctions is a helper to call all the inputted functions and return if one errors.
