@@ -24,9 +24,11 @@ type Call = func(context.Context, resource.Sensor, map[string]any) (any, error)
 // Validate performs config validation.
 func (cfg Config) Validate(path string) ([]string, []string, error) {
 	var deps []string
+
 	if cfg.Primary == "" {
 		return nil, nil, utils.NewConfigValidationFieldRequiredError(path, "primary")
 	}
+
 	deps = append(deps, cfg.Primary)
 
 	if len(cfg.Backups) == 0 {
@@ -42,7 +44,7 @@ func (cfg Config) Validate(path string) ([]string, []string, error) {
 func CallAllFunctions(ctx context.Context,
 	s resource.Sensor,
 	timeout int,
-	extra map[string]interface{},
+	extra map[string]any,
 	calls []Call,
 ) error {
 	for _, call := range calls {
@@ -52,6 +54,7 @@ func CallAllFunctions(ctx context.Context,
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -77,7 +80,9 @@ func TryReadingOrFail[K any](ctx context.Context,
 
 	// Buffer so the worker can exit even if the caller has already timed out/canceled.
 	resultChan := make(chan ReadingsResult, 1)
+
 	var zero K
+
 	go func() {
 		reading, err := call(cancelCtx, s, extra)
 		resultChan <- ReadingsResult{readings: reading, err: err}
@@ -96,6 +101,7 @@ func TryReadingOrFail[K any](ctx context.Context,
 		if result.err != nil {
 			return zero, result.err
 		}
+
 		return result.readings.(K), nil
 	}
 }
@@ -107,6 +113,7 @@ func ReadingsWrapper(ctx context.Context, s resource.Sensor, extra map[string]an
 	if err != nil {
 		return nil, err
 	}
+
 	return readings, err
 }
 
@@ -116,13 +123,16 @@ func ReadingsWrapper(ctx context.Context, s resource.Sensor, extra map[string]an
 // NumGoroutine immediately after Close.
 func WaitForGoroutineCount(want int, d time.Duration) bool {
 	deadline := time.Now().Add(d)
+
 	for {
 		if runtime.NumGoroutine() <= want {
 			return true
 		}
+
 		if time.Now().After(deadline) {
 			return false
 		}
+
 		time.Sleep(time.Millisecond)
 	}
 }

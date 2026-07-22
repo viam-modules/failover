@@ -3,11 +3,11 @@ package failovermovementsensor
 import (
 	"context"
 	"errors"
-	"failover/common"
 	"runtime"
 	"testing"
 	"time"
 
+	"failover/common"
 	"github.com/golang/geo/r3"
 	geo "github.com/kellydunn/golang-geo"
 	"go.viam.com/rdk/components/movementsensor"
@@ -56,15 +56,15 @@ func setup(t *testing.T) (testMovementSensors, resource.Dependencies) {
 	deps[movementsensor.Named(backup1Name)] = movementSensors.backup1
 	deps[movementsensor.Named(backup2Name)] = movementSensors.backup2
 
-	movementSensors.primary.ReadingsFunc = func(ctx context.Context, extra map[string]interface{}) (map[string]any, error) {
+	movementSensors.primary.ReadingsFunc = func(ctx context.Context, extra map[string]any) (map[string]any, error) {
 		return map[string]any{"a": 4}, nil
 	}
 
-	movementSensors.backup1.ReadingsFunc = func(ctx context.Context, extra map[string]interface{}) (map[string]any, error) {
+	movementSensors.backup1.ReadingsFunc = func(ctx context.Context, extra map[string]any) (map[string]any, error) {
 		return map[string]any{"a": 4}, nil
 	}
 
-	movementSensors.backup2.ReadingsFunc = func(ctx context.Context, extra map[string]interface{}) (map[string]any, error) {
+	movementSensors.backup2.ReadingsFunc = func(ctx context.Context, extra map[string]any) (map[string]any, error) {
 		return map[string]any{"a": 4}, nil
 	}
 
@@ -72,11 +72,11 @@ func setup(t *testing.T) (testMovementSensors, resource.Dependencies) {
 		return r3.Vector{}, nil
 	}
 
-	movementSensors.backup1.LinearVelocityFunc = func(ctx context.Context, extra map[string]interface{}) (r3.Vector, error) {
+	movementSensors.backup1.LinearVelocityFunc = func(ctx context.Context, extra map[string]any) (r3.Vector, error) {
 		return r3.Vector{}, nil
 	}
 
-	movementSensors.backup2.LinearVelocityFunc = func(ctx context.Context, extra map[string]interface{}) (r3.Vector, error) {
+	movementSensors.backup2.LinearVelocityFunc = func(ctx context.Context, extra map[string]any) (r3.Vector, error) {
 		return r3.Vector{}, nil
 	}
 
@@ -137,7 +137,7 @@ func setup(t *testing.T) (testMovementSensors, resource.Dependencies) {
 		return &geo.Point{}, 9, nil
 	}
 
-	movementSensors.primary.PropertiesFunc = func(ctx context.Context, extra map[string]interface{}) (*movementsensor.Properties, error) {
+	movementSensors.primary.PropertiesFunc = func(ctx context.Context, extra map[string]any) (*movementsensor.Properties, error) {
 		return &movementsensor.Properties{
 			PositionSupported:           true,
 			CompassHeadingSupported:     true,
@@ -148,7 +148,7 @@ func setup(t *testing.T) (testMovementSensors, resource.Dependencies) {
 		}, nil
 	}
 
-	movementSensors.backup1.PropertiesFunc = func(ctx context.Context, extra map[string]interface{}) (*movementsensor.Properties, error) {
+	movementSensors.backup1.PropertiesFunc = func(ctx context.Context, extra map[string]any) (*movementsensor.Properties, error) {
 		return &movementsensor.Properties{
 			PositionSupported:           true,
 			CompassHeadingSupported:     true,
@@ -159,7 +159,7 @@ func setup(t *testing.T) (testMovementSensors, resource.Dependencies) {
 		}, nil
 	}
 
-	movementSensors.backup2.PropertiesFunc = func(ctx context.Context, extra map[string]interface{}) (*movementsensor.Properties, error) {
+	movementSensors.backup2.PropertiesFunc = func(ctx context.Context, extra map[string]any) (*movementsensor.Properties, error) {
 		return &movementsensor.Properties{
 			PositionSupported:           true,
 			CompassHeadingSupported:     true,
@@ -170,13 +170,13 @@ func setup(t *testing.T) (testMovementSensors, resource.Dependencies) {
 		}, nil
 	}
 
-	movementSensors.primary.AccuracyFunc = func(ctx context.Context, extra map[string]interface{}) (*movementsensor.Accuracy, error) {
+	movementSensors.primary.AccuracyFunc = func(ctx context.Context, extra map[string]any) (*movementsensor.Accuracy, error) {
 		return &movementsensor.Accuracy{NmeaFix: 2}, nil
 	}
-	movementSensors.backup1.AccuracyFunc = func(ctx context.Context, extra map[string]interface{}) (*movementsensor.Accuracy, error) {
+	movementSensors.backup1.AccuracyFunc = func(ctx context.Context, extra map[string]any) (*movementsensor.Accuracy, error) {
 		return &movementsensor.Accuracy{NmeaFix: 2}, nil
 	}
-	movementSensors.backup2.AccuracyFunc = func(ctx context.Context, extra map[string]interface{}) (*movementsensor.Accuracy, error) {
+	movementSensors.backup2.AccuracyFunc = func(ctx context.Context, extra map[string]any) (*movementsensor.Accuracy, error) {
 		return &movementsensor.Accuracy{NmeaFix: 2}, nil
 	}
 
@@ -306,6 +306,7 @@ func TestPosition(t *testing.T) {
 			if !utils.SelectContextOrWait(ctx, time.Duration(tc.primaryTimeSeconds)*time.Second) {
 				return nil, 0, errors.New("timed out")
 			}
+
 			return tc.primaryPos, tc.primaryAlt, tc.primaryErr
 		}
 
@@ -406,6 +407,7 @@ func TestLinearVelocity(t *testing.T) {
 			if !utils.SelectContextOrWait(ctx, time.Duration(tc.primaryTimeSeconds)*time.Second) {
 				return r3.Vector{}, errors.New("timed out")
 			}
+
 			return tc.primaryRet, tc.primaryErr
 		}
 
@@ -505,6 +507,7 @@ func TestAngularVelocity(t *testing.T) {
 			if !utils.SelectContextOrWait(ctx, time.Duration(tc.primaryTimeSeconds)*time.Second) {
 				return spatialmath.AngularVelocity{}, errors.New("timed out")
 			}
+
 			return tc.primaryRet, tc.primaryErr
 		}
 
@@ -604,6 +607,7 @@ func TestLinearAcceleration(t *testing.T) {
 			if !utils.SelectContextOrWait(ctx, time.Duration(tc.primaryTimeSeconds)*time.Second) {
 				return r3.Vector{}, errors.New("timed out")
 			}
+
 			return tc.primaryRet, tc.primaryErr
 		}
 
@@ -703,6 +707,7 @@ func TestOrientation(t *testing.T) {
 			if !utils.SelectContextOrWait(ctx, time.Duration(tc.primaryTimeSeconds)*time.Second) {
 				return &spatialmath.OrientationVector{}, errors.New("timed out")
 			}
+
 			return tc.primaryRet, tc.primaryErr
 		}
 
@@ -802,6 +807,7 @@ func TestCompassHeading(t *testing.T) {
 			if !utils.SelectContextOrWait(ctx, time.Duration(tc.primaryTimeSeconds)*time.Second) {
 				return 0, errors.New("timed out")
 			}
+
 			return tc.primaryRet, tc.primaryErr
 		}
 
@@ -879,6 +885,7 @@ func TestAccuracy(t *testing.T) {
 		goRoutinesStart := runtime.NumGoroutine()
 		ms, err := newFailoverMovementSensor(ctx, deps, config, logger)
 		test.That(t, err, test.ShouldBeNil)
+
 		mov := ms.(*failoverMovementSensor)
 		mov.lastWorkingSensor = tc.workingSensor
 
@@ -980,6 +987,7 @@ func TestReadings(t *testing.T) {
 			if !utils.SelectContextOrWait(ctx, time.Duration(tc.primaryTimeSeconds)*time.Second) {
 				return map[string]any{}, errors.New("timed out")
 			}
+
 			return tc.primaryRet, tc.primaryErr
 		}
 

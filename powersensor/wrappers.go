@@ -57,10 +57,12 @@ func powerWrapper(ctx context.Context, s resource.Sensor, extra map[string]any) 
 	if err != nil {
 		return math.NaN(), err
 	}
+
 	watts, err := ps.Power(ctx, extra)
 	if err != nil {
 		return math.NaN(), err
 	}
+
 	return watts, nil
 }
 
@@ -69,5 +71,6 @@ func convertToPowerSensor(s resource.Sensor) (powersensor.PowerSensor, error) {
 	if !ok {
 		return nil, errors.New("type assertion to power sensor failed")
 	}
+
 	return ps, nil
 }

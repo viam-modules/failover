@@ -49,6 +49,7 @@ func linearVelocityWrapper(ctx context.Context, s resource.Sensor, extra map[str
 	if err != nil {
 		return r3.Vector{}, err
 	}
+
 	return vel, nil
 }
 
@@ -62,6 +63,7 @@ func angularVelocityWrapper(ctx context.Context, s resource.Sensor, extra map[st
 	if err != nil {
 		return spatialmath.AngularVelocity{}, err
 	}
+
 	return vel, nil
 }
 
@@ -75,6 +77,7 @@ func linearAccelerationWrapper(ctx context.Context, s resource.Sensor, extra map
 	if err != nil {
 		return r3.Vector{}, err
 	}
+
 	return acc, nil
 }
 
@@ -88,6 +91,7 @@ func compassHeadingWrapper(ctx context.Context, s resource.Sensor, extra map[str
 	if err != nil {
 		return 0, err
 	}
+
 	return heading, nil
 }
 
@@ -101,5 +105,6 @@ func orientationWrapper(ctx context.Context, s resource.Sensor, extra map[string
 	if err != nil {
 		return nil, err
 	}
+
 	return orientation, nil
 }

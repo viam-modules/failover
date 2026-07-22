@@ -52,12 +52,14 @@ func CreatePrimary(ctx context.Context,
 func (p *Primary) UsePrimary() bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+
 	return p.usePrimary
 }
 
 func (p *Primary) setUsePrimary(val bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+
 	p.usePrimary = val
 }
 
@@ -92,6 +94,7 @@ func TryPrimary[T any](ctx context.Context,
 		reading := any(readings).(T)
 		return reading, nil
 	}
+
 	var zero T
 
 	// upon error of the last working sensor, log the error.
@@ -100,6 +103,7 @@ func TryPrimary[T any](ctx context.Context,
 	// If the primary failed, tell the goroutine to start checking the health.
 	s.signalPoll()
 	s.setUsePrimary(false)
+
 	return zero, err
 }
 
@@ -111,6 +115,7 @@ func (p *Primary) PollPrimaryForHealth() {
 		// poll every 100 ms.
 		ticker := time.NewTicker(time.Millisecond * 100)
 		defer ticker.Stop()
+
 		for {
 			select {
 			// wait for data to come into the channel before polling.

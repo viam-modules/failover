@@ -27,6 +27,7 @@ func init() {
 type failoverPowerSensor struct {
 	resource.AlwaysRebuild
 	resource.Named
+
 	logger logging.Logger
 
 	mu      sync.Mutex
@@ -51,7 +52,7 @@ func newFailoverPowerSensor(ctx context.Context,
 		logger: logger,
 	}
 
-	primary, err := powersensor.FromDependencies(deps, config.Primary)
+	primary, err := powersensor.FromProvider(deps, config.Primary)
 	if err != nil {
 		return nil, err
 	}
@@ -65,10 +66,11 @@ func newFailoverPowerSensor(ctx context.Context,
 	backups := []resource.Sensor{}
 
 	for _, backup := range config.Backups {
-		backup, err := powersensor.FromDependencies(deps, backup)
+		backup, err := powersensor.FromProvider(deps, backup)
 		if err != nil {
 			ps.logger.Errorf(err.Error())
 		}
+
 		backups = append(backups, backup)
 	}
 
@@ -108,6 +110,7 @@ func (ps *failoverPowerSensor) Voltage(ctx context.Context, extra map[string]any
 	if !ok {
 		return math.NaN(), false, errors.New("failed to get voltage: type assertion failed")
 	}
+
 	return vals.volts, vals.isAc, nil
 }
 
@@ -140,6 +143,7 @@ func (ps *failoverPowerSensor) Current(ctx context.Context, extra map[string]any
 	if !ok {
 		return math.NaN(), false, errors.New("failed to get current: type assertion failed")
 	}
+
 	return currentVals.amps, currentVals.isAc, nil
 }
 
@@ -169,10 +173,12 @@ func (ps *failoverPowerSensor) Power(ctx context.Context, extra map[string]any) 
 	if err != nil {
 		return math.NaN(), fmt.Errorf("all power sensors failed to get power: %w", err)
 	}
+
 	watts, ok := readings.(float64)
 	if !ok {
 		return math.NaN(), errors.New("failed to get power: type assertion failed")
 	}
+
 	return watts, nil
 }
 
@@ -200,10 +206,11 @@ func (ps *failoverPowerSensor) Readings(ctx context.Context, extra map[string]an
 		return nil, fmt.Errorf("all power sensors failed to get readings: %w", err)
 	}
 
-	reading, ok := readings.(map[string]interface{})
+	reading, ok := readings.(map[string]any)
 	if !ok {
 		return nil, errors.New("failed to get readings: type assertion failed")
 	}
+
 	return reading, nil
 }
 

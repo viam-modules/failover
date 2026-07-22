@@ -1,82 +1,87 @@
-service:
-  golangci-lint-version: 1.51.x
+version: "2"
 run:
-  deadline: 900s
   modules-download-mode: readonly
 linters:
-  enable-all: true
+  default: all
   disable:
     - asasalint
     - containedctx
     - contextcheck
-    - nilnil
-    - dupl
-    - unconvert
-    - revive
     - cyclop
-    - deadcode
-    - exhaustivestruct
+    - depguard
+    - dupl
+    - err113
     - exhaustruct
     - forcetypeassert
     - funlen
-    - gocognit
-    - godox
-    - goerr113
     - gochecknoglobals
     - gochecknoinits
+    - gocognit
     - gocyclo
-    - gofmt
-    - goimports
-    - golint
-    - gomnd
-    - ifshort
+    - godox
     - importas
     - interfacebloat
-    - interfacer
     - ireturn
     - maintidx
-    - maligned
     - makezero
+    - mnd
     - musttag
     - nestif
+    - nilnil
     - nlreturn
     - nonamedreturns
     - nosprintfhostport
     - paralleltest
     - prealloc
-    - scopelint
-    - structcheck
+    - revive
     - tagliatelle
     - testpackage
-    - varcheck
+    - unconvert
     - varnamelen
     - wrapcheck
     - wsl
-    - depguard
-linters-settings:
-  gci:
-    sections:
-      - standard
-      - default
-  gofumpt:
-    lang-version: "1.21"
-    extra-rules: true
-  govet:
-    enable-all: true
-    disable:
-      - fieldalignment
-      - shadow
-      - composites
-  lll:
-    line-length: 140
+    # Newer defaults not enforced by the previous v1 config.
+    - funcorder
+    - godoclint
+    - noinlineerr
+  settings:
+    govet:
+      disable:
+        - fieldalignment
+        - shadow
+        - composites
+      enable-all: true
+    lll:
+      line-length: 140
+  exclusions:
+    generated: lax
+    rules:
+      - linters:
+          - dupword
+          - exhaustive
+          - goconst
+          - gosec
+        path: _test\.go$
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
 issues:
-  exclude-rules:
-    - path: _test\.go$
-      linters:
-        - dupword
-        - exhaustive
-        - goconst
-        - gosec
-  exclude-use-default: false
-  max-per-linter: 0
   max-same-issues: 0
+formatters:
+  enable:
+    - gci
+    - gofumpt
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+    gofumpt:
+      extra-rules: true
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
