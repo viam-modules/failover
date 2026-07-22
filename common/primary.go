@@ -32,7 +32,7 @@ func CreatePrimary(ctx context.Context,
 ) *Primary {
 	primary := &Primary{
 		workers:         viamutils.NewBackgroundStoppableWorkers(),
-		pollPrimaryChan: make(chan bool),
+		pollPrimaryChan: make(chan bool, 1),
 		usePrimary:      true,
 		timeout:         timeout,
 		primarySensor:   primarySensor,
@@ -61,6 +61,15 @@ func (p *Primary) setUsePrimary(val bool) {
 	p.usePrimary = val
 }
 
+// signalPoll asks the health-poll worker to start checking the primary.
+// Non-blocking so we never deadlock if the worker is already polling.
+func (p *Primary) signalPoll() {
+	select {
+	case p.pollPrimaryChan <- true:
+	default:
+	}
+}
+
 // TryAllReadings checks that all functions on primary are working,
 // if not tell the goroutine to start polling for health and don't use the primary.
 func (p *Primary) TryAllReadings(ctx context.Context) {
@@ -68,7 +77,7 @@ func (p *Primary) TryAllReadings(ctx context.Context) {
 	if err != nil {
 		p.logger.Warnf("primary sensor failed: %s", err.Error())
 		p.setUsePrimary(false)
-		p.pollPrimaryChan <- true
+		p.signalPoll()
 	}
 }
 
@@ -89,7 +98,7 @@ func TryPrimary[T any](ctx context.Context,
 	s.logger.Warnf("primary sensor failed: %s", err.Error())
 
 	// If the primary failed, tell the goroutine to start checking the health.
-	s.pollPrimaryChan <- true
+	s.signalPoll()
 	s.setUsePrimary(false)
 	return zero, err
 }
@@ -98,9 +107,10 @@ func TryPrimary[T any](ctx context.Context,
 // Then, it calls all APIs on the primary sensor until they are all successful and updates the
 // UsePrimary flag.
 func (p *Primary) PollPrimaryForHealth() {
-	// poll every 100 ms.
-	ticker := time.NewTicker(time.Millisecond * 100)
 	p.workers.Add(func(ctx context.Context) {
+		// poll every 100 ms.
+		ticker := time.NewTicker(time.Millisecond * 100)
+		defer ticker.Stop()
 		for {
 			select {
 			// wait for data to come into the channel before polling.
@@ -128,7 +138,9 @@ func (p *Primary) PollPrimaryForHealth() {
 }
 
 func (p *Primary) Close() {
-	close(p.pollPrimaryChan)
+	// Stop workers first so the poll goroutine can exit via ctx.Done().
+	// Closing the channel before Stop can spuriously wake the worker and race
+	// with shutdown, leaving briefly-lived goroutines that flake leak checks.
 	if p.workers != nil {
 		p.workers.Stop()
 	}

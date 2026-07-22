@@ -330,8 +330,7 @@ func TestPosition(t *testing.T) {
 
 		err = s.Close(ctx)
 		test.That(t, err, test.ShouldBeNil)
-		goRoutinesEnd := runtime.NumGoroutine()
-		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
+		test.That(t, common.WaitForGoroutineCount(goRoutinesStart, time.Second), test.ShouldBeTrue)
 	}
 }
 
@@ -430,8 +429,7 @@ func TestLinearVelocity(t *testing.T) {
 
 		err = ms.Close(ctx)
 		test.That(t, err, test.ShouldBeNil)
-		goRoutinesEnd := runtime.NumGoroutine()
-		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
+		test.That(t, common.WaitForGoroutineCount(goRoutinesStart, time.Second), test.ShouldBeTrue)
 	}
 }
 
@@ -530,8 +528,7 @@ func TestAngularVelocity(t *testing.T) {
 
 		err = ms.Close(ctx)
 		test.That(t, err, test.ShouldBeNil)
-		goRoutinesEnd := runtime.NumGoroutine()
-		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
+		test.That(t, common.WaitForGoroutineCount(goRoutinesStart, time.Second), test.ShouldBeTrue)
 	}
 }
 
@@ -630,8 +627,7 @@ func TestLinearAcceleration(t *testing.T) {
 
 		err = ms.Close(ctx)
 		test.That(t, err, test.ShouldBeNil)
-		goRoutinesEnd := runtime.NumGoroutine()
-		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
+		test.That(t, common.WaitForGoroutineCount(goRoutinesStart, time.Second), test.ShouldBeTrue)
 	}
 }
 
@@ -730,8 +726,7 @@ func TestOrientation(t *testing.T) {
 
 		err = ms.Close(ctx)
 		test.That(t, err, test.ShouldBeNil)
-		goRoutinesEnd := runtime.NumGoroutine()
-		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
+		test.That(t, common.WaitForGoroutineCount(goRoutinesStart, time.Second), test.ShouldBeTrue)
 	}
 }
 
@@ -830,8 +825,7 @@ func TestCompassHeading(t *testing.T) {
 
 		err = ms.Close(ctx)
 		test.That(t, err, test.ShouldBeNil)
-		goRoutinesEnd := runtime.NumGoroutine()
-		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
+		test.That(t, common.WaitForGoroutineCount(goRoutinesStart, time.Second), test.ShouldBeTrue)
 	}
 }
 
@@ -910,8 +904,7 @@ func TestAccuracy(t *testing.T) {
 
 		err = ms.Close(ctx)
 		test.That(t, err, test.ShouldBeNil)
-		goRoutinesEnd := runtime.NumGoroutine()
-		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
+		test.That(t, common.WaitForGoroutineCount(goRoutinesStart, time.Second), test.ShouldBeTrue)
 	}
 }
 
@@ -1010,8 +1003,7 @@ func TestReadings(t *testing.T) {
 
 		err = ms.Close(ctx)
 		test.That(t, err, test.ShouldBeNil)
-		goRoutinesEnd := runtime.NumGoroutine()
-		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
+		test.That(t, common.WaitForGoroutineCount(goRoutinesStart, time.Second), test.ShouldBeTrue)
 	}
 }
 

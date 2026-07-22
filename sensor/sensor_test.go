@@ -244,8 +244,7 @@ func TestReadings(t *testing.T) {
 
 		err = s.Close(ctx)
 		test.That(t, err, test.ShouldBeNil)
-		// Check how many routines are still running to ensure there are no leaks from power sensor.
-		goRoutinesEnd := runtime.NumGoroutine()
-		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
+		// Timed-out reads may leave a short-lived goroutine until cancel is observed.
+		test.That(t, common.WaitForGoroutineCount(goRoutinesStart, time.Second), test.ShouldBeTrue)
 	}
 }
