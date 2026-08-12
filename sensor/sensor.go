@@ -4,9 +4,9 @@ package failoversensor
 import (
 	"context"
 	"errors"
-	"failover/common"
 	"fmt"
 
+	"failover/common"
 	"go.viam.com/rdk/components/sensor"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
@@ -36,7 +36,7 @@ func newFailoverSensor(ctx context.Context, deps resource.Dependencies, conf res
 		logger: logger,
 	}
 
-	primary, err := sensor.FromDependencies(deps, config.Primary)
+	primary, err := sensor.FromProvider(deps, config.Primary)
 	if err != nil {
 		return nil, err
 	}
@@ -49,10 +49,11 @@ func newFailoverSensor(ctx context.Context, deps resource.Dependencies, conf res
 	backups := []resource.Sensor{}
 
 	for _, backup := range config.Backups {
-		backup, err := sensor.FromDependencies(deps, backup)
+		backup, err := sensor.FromProvider(deps, backup)
 		if err != nil {
 			s.logger.Errorf(err.Error())
 		}
+
 		backups = append(backups, backup)
 	}
 
@@ -60,6 +61,7 @@ func newFailoverSensor(ctx context.Context, deps resource.Dependencies, conf res
 
 	s.primary = common.CreatePrimary(ctx, s.timeout, logger, primary, calls)
 	s.backups = common.CreateBackup(s.timeout, backups, calls)
+
 	return s, nil
 }
 
@@ -74,7 +76,7 @@ type failoverSensor struct {
 	timeout int
 }
 
-func (s *failoverSensor) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
+func (s *failoverSensor) Readings(ctx context.Context, extra map[string]any) (map[string]any, error) {
 	// If UsePrimary flag is set, call readings on primary sensor and return if no error.
 	if s.primary.UsePrimary() {
 		readings, err := common.TryPrimary[map[string]any](ctx, s.primary, extra, common.ReadingsWrapper)
@@ -95,10 +97,11 @@ func (s *failoverSensor) Readings(ctx context.Context, extra map[string]interfac
 		return nil, fmt.Errorf("all sensors failed to get readings: %w", err)
 	}
 
-	reading, ok := readings.(map[string]interface{})
+	reading, ok := readings.(map[string]any)
 	if !ok {
 		return nil, errors.New("failed to get readings: type assertion failed")
 	}
+
 	return reading, nil
 }
 

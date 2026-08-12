@@ -34,7 +34,7 @@ func CreateBackup(timeout int,
 	return backups
 }
 
-func (b *Backups) GetWorkingSensor(ctx context.Context, extra map[string]interface{}) (resource.Sensor, error) {
+func (b *Backups) GetWorkingSensor(ctx context.Context, extra map[string]any) (resource.Sensor, error) {
 	lastWorking := b.getLastWorkingSensor()
 
 	// Get the API calls the last working sensor supports.
@@ -64,6 +64,7 @@ func (b *Backups) GetWorkingSensor(ctx context.Context, extra map[string]interfa
 		}
 		// all calls were successful, replace lastworkingsensor and return.
 		b.setLastWorkingSensor(backup)
+
 		return backup, nil
 	}
 
@@ -78,17 +79,20 @@ func (b *Backups) GetWorkingSensor(ctx context.Context, extra map[string]interfa
 func (b *Backups) getLastWorkingSensor() resource.Sensor {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+
 	return b.lastWorkingSensor
 }
 
 func (b *Backups) setLastWorkingSensor(sensor resource.Sensor) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+
 	b.lastWorkingSensor = sensor
 }
 
 func (b *Backups) SetCallsMap(callsMap map[resource.Sensor][]Call) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+
 	b.callsMap = callsMap
 }

@@ -20,7 +20,7 @@ func main() {
 }
 
 func mainWithArgs(ctx context.Context, args []string, logger logging.Logger) error {
-	failover, err := module.NewModuleFromArgs(ctx, logger)
+	failover, err := module.NewModuleFromArgs(ctx)
 	if err != nil {
 		return err
 	}
@@ -39,10 +39,12 @@ func mainWithArgs(ctx context.Context, args []string, logger logging.Logger) err
 
 	err = failover.Start(ctx)
 	defer failover.Close(ctx)
+
 	if err != nil {
 		return err
 	}
 
 	<-ctx.Done()
+
 	return nil
 }

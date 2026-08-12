@@ -3,18 +3,17 @@ package failoversensor
 import (
 	"context"
 	"errors"
-	"failover/common"
 	"runtime"
 	"testing"
 	"time"
 
-	"go.viam.com/utils"
-
+	"failover/common"
 	"go.viam.com/rdk/components/sensor"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/testutils/inject"
 	"go.viam.com/test"
+	"go.viam.com/utils"
 )
 
 const (
@@ -45,14 +44,14 @@ func setup(t *testing.T) (testSensors, resource.Dependencies) {
 	deps[sensor.Named(backup1Name)] = sensors.backup1
 	deps[sensor.Named(backup2Name)] = sensors.backup2
 
-	sensors.primary.ReadingsFunc = func(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
+	sensors.primary.ReadingsFunc = func(ctx context.Context, extra map[string]any) (map[string]any, error) {
 		return map[string]any{"foo": 1}, nil
 	}
 
-	sensors.backup1.ReadingsFunc = func(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
+	sensors.backup1.ReadingsFunc = func(ctx context.Context, extra map[string]any) (map[string]any, error) {
 		return map[string]any{"foo": 1}, nil
 	}
-	sensors.backup2.ReadingsFunc = func(_ context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
+	sensors.backup2.ReadingsFunc = func(_ context.Context, extra map[string]any) (map[string]any, error) {
 		return map[string]any{"foo": 1}, nil
 	}
 
@@ -122,13 +121,13 @@ func TestReadings(t *testing.T) {
 	tests := []struct {
 		name               string
 		config             resource.Config
-		primaryReading     map[string]interface{}
+		primaryReading     map[string]any
 		primaryErr         error
-		backup1Reading     map[string]interface{}
+		backup1Reading     map[string]any
 		backup1Err         error
-		backup2Reading     map[string]interface{}
+		backup2Reading     map[string]any
 		backup2Err         error
-		expectedReading    map[string]interface{}
+		expectedReading    map[string]any
 		expectErr          bool
 		primaryTimeSeconds int
 	}{
@@ -142,9 +141,9 @@ func TestReadings(t *testing.T) {
 					Timeout: 1,
 				},
 			},
-			primaryReading:  map[string]interface{}{"primary_reading": 1},
-			backup1Reading:  map[string]interface{}{"a": 1},
-			expectedReading: map[string]interface{}{"primary_reading": 1},
+			primaryReading:  map[string]any{"primary_reading": 1},
+			backup1Reading:  map[string]any{"a": 1},
+			expectedReading: map[string]any{"primary_reading": 1},
 		},
 		{
 			name: "if the primary fails, backup1 is returned",
@@ -158,8 +157,8 @@ func TestReadings(t *testing.T) {
 			},
 			primaryReading:  nil,
 			primaryErr:      errReading,
-			backup1Reading:  map[string]interface{}{"a": 1},
-			expectedReading: map[string]interface{}{"a": 1},
+			backup1Reading:  map[string]any{"a": 1},
+			expectedReading: map[string]any{"a": 1},
 			expectErr:       false,
 		},
 		{
@@ -174,8 +173,8 @@ func TestReadings(t *testing.T) {
 			},
 			primaryErr:      errReading,
 			backup1Err:      errReading,
-			backup2Reading:  map[string]interface{}{"a": 2},
-			expectedReading: map[string]interface{}{"a": 2},
+			backup2Reading:  map[string]any{"a": 2},
+			expectedReading: map[string]any{"a": 2},
 			expectErr:       false,
 		},
 		{
@@ -203,10 +202,10 @@ func TestReadings(t *testing.T) {
 					Timeout: 1,
 				},
 			},
-			primaryReading:     map[string]interface{}{"a": 1},
+			primaryReading:     map[string]any{"a": 1},
 			primaryTimeSeconds: 1,
-			backup1Reading:     map[string]interface{}{"a": 2},
-			expectedReading:    map[string]interface{}{"a": 2},
+			backup1Reading:     map[string]any{"a": 2},
+			expectedReading:    map[string]any{"a": 2},
 			expectErr:          false,
 		},
 	}
@@ -215,17 +214,18 @@ func TestReadings(t *testing.T) {
 		// Check how many goroutines are running before we create the power sensor to compare at the end.
 		goRoutinesStart := runtime.NumGoroutine()
 
-		sensors.primary.ReadingsFunc = func(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
+		sensors.primary.ReadingsFunc = func(ctx context.Context, extra map[string]any) (map[string]any, error) {
 			if !utils.SelectContextOrWait(ctx, time.Duration(tc.primaryTimeSeconds)*time.Second) {
 				return nil, errors.New("timed out")
 			}
+
 			return tc.primaryReading, tc.primaryErr
 		}
 
-		sensors.backup1.ReadingsFunc = func(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
+		sensors.backup1.ReadingsFunc = func(ctx context.Context, extra map[string]any) (map[string]any, error) {
 			return tc.backup1Reading, tc.backup1Err
 		}
-		sensors.backup2.ReadingsFunc = func(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
+		sensors.backup2.ReadingsFunc = func(ctx context.Context, extra map[string]any) (map[string]any, error) {
 			return tc.backup2Reading, tc.backup2Err
 		}
 
@@ -244,8 +244,7 @@ func TestReadings(t *testing.T) {
 
 		err = s.Close(ctx)
 		test.That(t, err, test.ShouldBeNil)
-		// Check how many routines are still running to ensure there are no leaks from power sensor.
-		goRoutinesEnd := runtime.NumGoroutine()
-		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
+		// Timed-out reads may leave a short-lived goroutine until cancel is observed.
+		test.That(t, common.WaitForGoroutineCount(goRoutinesStart, time.Second), test.ShouldBeTrue)
 	}
 }

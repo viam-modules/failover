@@ -4,6 +4,7 @@ package common
 import (
 	"context"
 	"errors"
+	"runtime"
 	"time"
 
 	"go.viam.com/rdk/resource"
@@ -21,27 +22,29 @@ type Config struct {
 type Call = func(context.Context, resource.Sensor, map[string]any) (any, error)
 
 // Validate performs config validation.
-func (cfg Config) Validate(path string) ([]string, error) {
+func (cfg Config) Validate(path string) ([]string, []string, error) {
 	var deps []string
+
 	if cfg.Primary == "" {
-		return nil, utils.NewConfigValidationFieldRequiredError(path, "primary")
+		return nil, nil, utils.NewConfigValidationFieldRequiredError(path, "primary")
 	}
+
 	deps = append(deps, cfg.Primary)
 
 	if len(cfg.Backups) == 0 {
-		return nil, utils.NewConfigValidationFieldRequiredError(path, "backups")
+		return nil, nil, utils.NewConfigValidationFieldRequiredError(path, "backups")
 	}
 
 	deps = append(deps, cfg.Backups...)
 
-	return deps, nil
+	return deps, nil, nil
 }
 
 // CallAllFunctions is a helper to call all the inputted functions and return if one errors.
 func CallAllFunctions(ctx context.Context,
 	s resource.Sensor,
 	timeout int,
-	extra map[string]interface{},
+	extra map[string]any,
 	calls []Call,
 ) error {
 	for _, call := range calls {
@@ -51,6 +54,7 @@ func CallAllFunctions(ctx context.Context,
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -63,20 +67,6 @@ type ReadingsResult struct {
 	err      error
 }
 
-// getReading calls the inputted API call and returns the reading and error as a ReadingsResult struct.
-func getReading[K any](ctx context.Context,
-	call func(context.Context, resource.Sensor, map[string]any) (K, error),
-	s resource.Sensor,
-	extra map[string]any,
-) ReadingsResult {
-	reading, err := call(ctx, s, extra)
-
-	return ReadingsResult{
-		readings: reading,
-		err:      err,
-	}
-}
-
 // TryReadingOrFail will call the inputted API and either error, timeout, or return the reading.
 func TryReadingOrFail[K any](ctx context.Context,
 	timeout int,
@@ -87,25 +77,32 @@ func TryReadingOrFail[K any](ctx context.Context,
 ) {
 	cancelCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	resultChan := make(chan ReadingsResult)
+
+	// Buffer so the worker can exit even if the caller has already timed out/canceled.
+	resultChan := make(chan ReadingsResult, 1)
+
 	var zero K
+
 	go func() {
-		select {
-		case <-cancelCtx.Done():
-			return
-		case resultChan <- getReading(cancelCtx, call, s, extra):
-		}
+		reading, err := call(cancelCtx, s, extra)
+		resultChan <- ReadingsResult{readings: reading, err: err}
 	}()
+
+	timer := time.NewTimer(time.Duration(timeout) * time.Millisecond)
+	defer timer.Stop()
+
 	select {
-	case <-time.After(time.Duration(timeout) * time.Millisecond):
+	case <-ctx.Done():
+		return zero, ctx.Err()
+	case <-timer.C:
 		// timed out - the context passed into the API call will be canceled on return.
 		return zero, errors.New("sensor timed out")
 	case result := <-resultChan:
 		if result.err != nil {
 			return zero, result.err
-		} else {
-			return result.readings.(K), nil
 		}
+
+		return result.readings.(K), nil
 	}
 }
 
@@ -116,5 +113,26 @@ func ReadingsWrapper(ctx context.Context, s resource.Sensor, extra map[string]an
 	if err != nil {
 		return nil, err
 	}
+
 	return readings, err
+}
+
+// WaitForGoroutineCount waits until runtime.NumGoroutine() is at most want,
+// or until d elapses. Timed-out sensor reads intentionally return before their
+// background call goroutines exit; tests should use this instead of comparing
+// NumGoroutine immediately after Close.
+func WaitForGoroutineCount(want int, d time.Duration) bool {
+	deadline := time.Now().Add(d)
+
+	for {
+		if runtime.NumGoroutine() <= want {
+			return true
+		}
+
+		if time.Now().After(deadline) {
+			return false
+		}
+
+		time.Sleep(time.Millisecond)
+	}
 }

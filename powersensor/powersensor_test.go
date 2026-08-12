@@ -3,18 +3,17 @@ package failoverpowersensor
 import (
 	"context"
 	"errors"
-	"failover/common"
 	"runtime"
 	"testing"
 	"time"
 
-	"go.viam.com/test"
-	"go.viam.com/utils"
-
+	"failover/common"
 	"go.viam.com/rdk/components/powersensor"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/testutils/inject"
+	"go.viam.com/test"
+	"go.viam.com/utils"
 )
 
 const (
@@ -54,7 +53,7 @@ func setup(t *testing.T) (testPowerSensors, resource.Dependencies) {
 	deps[powersensor.Named(backup1Name)] = powerSensors.backup1
 	deps[powersensor.Named(backup2Name)] = powerSensors.backup2
 
-	// Define defaults for the inject functions, these will be overriden in the tests.
+	// Define defaults for the inject functions, these will be overridden in the tests.
 	powerSensors.primary.VoltageFunc = func(ctx context.Context, extra map[string]any) (float64, bool, error) {
 		return 1, false, nil
 	}
@@ -208,6 +207,7 @@ func TestPower(t *testing.T) {
 			if !utils.SelectContextOrWait(ctx, time.Duration(tc.primaryTimeSeconds)*time.Second) {
 				return 0, errors.New("timed out")
 			}
+
 			return tc.primaryPower, tc.primaryErr
 		}
 
@@ -233,9 +233,8 @@ func TestPower(t *testing.T) {
 
 		err = s.Close(ctx)
 		test.That(t, err, test.ShouldBeNil)
-		// Check how many routines are still running to ensure there are no leaks from power sensor.
-		goRoutinesEnd := runtime.NumGoroutine()
-		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
+		// Timed-out reads may leave a short-lived goroutine until cancel is observed.
+		test.That(t, common.WaitForGoroutineCount(goRoutinesStart, time.Second), test.ShouldBeTrue)
 	}
 }
 
@@ -308,6 +307,7 @@ func TestCurrent(t *testing.T) {
 			if !utils.SelectContextOrWait(ctx, time.Duration(tc.primaryTimeSeconds)*time.Second) {
 				return 0, false, errors.New("timed out")
 			}
+
 			return tc.primaryCurrent, false, tc.primaryErr
 		}
 
@@ -332,9 +332,8 @@ func TestCurrent(t *testing.T) {
 
 		err = s.Close(ctx)
 		test.That(t, err, test.ShouldBeNil)
-		// Check how many routines are still running to ensure there are no leaks from power sensor.
-		goRoutinesEnd := runtime.NumGoroutine()
-		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
+		// Timed-out reads may leave a short-lived goroutine until cancel is observed.
+		test.That(t, common.WaitForGoroutineCount(goRoutinesStart, time.Second), test.ShouldBeTrue)
 	}
 }
 
@@ -407,6 +406,7 @@ func TestVoltage(t *testing.T) {
 			if !utils.SelectContextOrWait(ctx, time.Duration(tc.primaryTimeSeconds)*time.Second) {
 				return 0, false, errors.New("timed out")
 			}
+
 			return tc.primaryVoltage, false, tc.primaryErr
 		}
 
@@ -433,9 +433,8 @@ func TestVoltage(t *testing.T) {
 
 		err = s.Close(ctx)
 		test.That(t, err, test.ShouldBeNil)
-		// Check how many routines are still running to ensure there are no leaks from power sensor.
-		goRoutinesEnd := runtime.NumGoroutine()
-		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
+		// Timed-out reads may leave a short-lived goroutine until cancel is observed.
+		test.That(t, common.WaitForGoroutineCount(goRoutinesStart, time.Second), test.ShouldBeTrue)
 	}
 }
 
@@ -504,6 +503,7 @@ func TestReadings(t *testing.T) {
 			if !utils.SelectContextOrWait(ctx, time.Duration(tc.primaryTimeSeconds)*time.Second) {
 				return map[string]any{}, errors.New("timed out")
 			}
+
 			return tc.primaryReading, tc.primaryErr
 		}
 
@@ -529,8 +529,7 @@ func TestReadings(t *testing.T) {
 
 		err = s.Close(ctx)
 		test.That(t, err, test.ShouldBeNil)
-		// Check how many routines are still running to ensure there are no leaks from power sensor.
-		goRoutinesEnd := runtime.NumGoroutine()
-		test.That(t, goRoutinesStart, test.ShouldEqual, goRoutinesEnd)
+		// Timed-out reads may leave a short-lived goroutine until cancel is observed.
+		test.That(t, common.WaitForGoroutineCount(goRoutinesStart, time.Second), test.ShouldBeTrue)
 	}
 }

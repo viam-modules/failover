@@ -7,12 +7,12 @@ import (
 
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
-	rdkutils "go.viam.com/rdk/utils"
+	viamutils "go.viam.com/utils"
 )
 
 // Primary defines the primary sensor for the failover.
 type Primary struct {
-	workers         rdkutils.StoppableWorkers
+	workers         *viamutils.StoppableWorkers
 	logger          logging.Logger
 	primarySensor   resource.Sensor
 	pollPrimaryChan chan bool
@@ -31,8 +31,8 @@ func CreatePrimary(ctx context.Context,
 	calls []Call,
 ) *Primary {
 	primary := &Primary{
-		workers:         rdkutils.NewStoppableWorkers(),
-		pollPrimaryChan: make(chan bool),
+		workers:         viamutils.NewBackgroundStoppableWorkers(),
+		pollPrimaryChan: make(chan bool, 1),
 		usePrimary:      true,
 		timeout:         timeout,
 		primarySensor:   primarySensor,
@@ -52,13 +52,24 @@ func CreatePrimary(ctx context.Context,
 func (p *Primary) UsePrimary() bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+
 	return p.usePrimary
 }
 
 func (p *Primary) setUsePrimary(val bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+
 	p.usePrimary = val
+}
+
+// signalPoll asks the health-poll worker to start checking the primary.
+// Non-blocking so we never deadlock if the worker is already polling.
+func (p *Primary) signalPoll() {
+	select {
+	case p.pollPrimaryChan <- true:
+	default:
+	}
 }
 
 // TryAllReadings checks that all functions on primary are working,
@@ -68,7 +79,7 @@ func (p *Primary) TryAllReadings(ctx context.Context) {
 	if err != nil {
 		p.logger.Warnf("primary sensor failed: %s", err.Error())
 		p.setUsePrimary(false)
-		p.pollPrimaryChan <- true
+		p.signalPoll()
 	}
 }
 
@@ -83,14 +94,16 @@ func TryPrimary[T any](ctx context.Context,
 		reading := any(readings).(T)
 		return reading, nil
 	}
+
 	var zero T
 
 	// upon error of the last working sensor, log the error.
 	s.logger.Warnf("primary sensor failed: %s", err.Error())
 
 	// If the primary failed, tell the goroutine to start checking the health.
-	s.pollPrimaryChan <- true
+	s.signalPoll()
 	s.setUsePrimary(false)
+
 	return zero, err
 }
 
@@ -98,9 +111,11 @@ func TryPrimary[T any](ctx context.Context,
 // Then, it calls all APIs on the primary sensor until they are all successful and updates the
 // UsePrimary flag.
 func (p *Primary) PollPrimaryForHealth() {
-	// poll every 100 ms.
-	ticker := time.NewTicker(time.Millisecond * 100)
-	p.workers.AddWorkers(func(ctx context.Context) {
+	p.workers.Add(func(ctx context.Context) {
+		// poll every 100 ms.
+		ticker := time.NewTicker(time.Millisecond * 100)
+		defer ticker.Stop()
+
 		for {
 			select {
 			// wait for data to come into the channel before polling.
@@ -128,7 +143,9 @@ func (p *Primary) PollPrimaryForHealth() {
 }
 
 func (p *Primary) Close() {
-	close(p.pollPrimaryChan)
+	// Stop workers first so the poll goroutine can exit via ctx.Done().
+	// Closing the channel before Stop can spuriously wake the worker and race
+	// with shutdown, leaving briefly-lived goroutines that flake leak checks.
 	if p.workers != nil {
 		p.workers.Stop()
 	}
