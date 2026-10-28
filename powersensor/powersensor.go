@@ -68,7 +68,7 @@ func newFailoverPowerSensor(ctx context.Context,
 	for _, backup := range config.Backups {
 		backup, err := powersensor.FromProvider(deps, backup)
 		if err != nil {
-			ps.logger.Errorf(err.Error())
+			ps.logger.Errorf("%s", err.Error())
 		}
 
 		backups = append(backups, backup)
