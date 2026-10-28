@@ -91,13 +91,13 @@ func newFailoverMovementSensor(ctx context.Context, deps resource.Dependencies, 
 		backup, err := movementsensor.FromProvider(deps, backup)
 		// if we couldnt get the backup, log the error and get the next one.
 		if err != nil {
-			s.logger.Errorf(err.Error())
+			s.logger.Errorf("%s", err.Error())
 			continue
 		}
 
 		props, err := backup.Properties(ctx, nil)
 		if err != nil {
-			s.logger.Errorf(err.Error())
+			s.logger.Errorf("%s", err.Error())
 			continue
 		}
 
