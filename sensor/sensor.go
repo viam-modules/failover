@@ -51,7 +51,7 @@ func newFailoverSensor(ctx context.Context, deps resource.Dependencies, conf res
 	for _, backup := range config.Backups {
 		backup, err := sensor.FromProvider(deps, backup)
 		if err != nil {
-			s.logger.Errorf(err.Error())
+			s.logger.Errorf("%s", err.Error())
 		}
 
 		backups = append(backups, backup)
